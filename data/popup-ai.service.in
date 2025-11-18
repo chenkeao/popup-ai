@@ -1,0 +1,12 @@
+[Unit]
+Description=Popup AI Assistant Background Service
+After=graphical-session.target
+
+[Service]
+Type=dbus
+BusName=@application_id@
+ExecStart=@bindir@/popup-ai --service
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,14 @@
+[Desktop Entry]
+Name=Popup AI
+Comment=AI assistant popup window
+Exec=@bindir@/popup-ai %U
+Icon=@application_id@
+Terminal=false
+Type=Application
+Categories=Utility;Office;
+Keywords=AI;Chat;Assistant;GPT;
+StartupNotify=true
+StartupWMClass=@application_id@
+DBusActivatable=false
+X-GNOME-UsesNotifications=true
+NoDisplay=true

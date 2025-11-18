@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema path="/io/github/chenkeao/popup-ai/" id="io.github.chenkeao.popup-ai">
+    <key name="window-width" type="i">
+      <default>800</default>
+      <summary>Window width</summary>
+    </key>
+    <key name="window-height" type="i">
+      <default>600</default>
+      <summary>Window height</summary>
+    </key>
+    <key name="selected-model" type="s">
+      <default>""</default>
+      <summary>Selected AI model</summary>
+    </key>
+    <key name="selected-prompt" type="s">
+      <default>""</default>
+      <summary>Selected prompt template</summary>
+    </key>
+    <key name="ollama-endpoint" type="s">
+      <default>"http://localhost:11434"</default>
+      <summary>Ollama API endpoint</summary>
+    </key>
+  </schema>
+</schemalist>
