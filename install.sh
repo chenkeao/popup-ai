@@ -49,18 +49,19 @@ meson compile -C build
 echo "Installing..."
 meson install -C build
 
-# Install systemd service manually
-echo "Installing systemd service..."
-mkdir -p ~/.config/systemd/user
-cp build/popup-ai.service ~/.config/systemd/user/
-systemctl --user daemon-reload
-systemctl --user stop popup-ai.service
-systemctl --user start popup-ai.service
-
-
 # Compile GSchema
 echo "Compiling GSchema..."
 glib-compile-schemas ~/.local/share/glib-2.0/schemas/
 
-echo "Enable and start the background service:"
-echo "  systemctl --user enable --now popup-ai.service"
+echo ""
+echo "✓ Installation complete!"
+echo ""
+echo "Usage:"
+echo "  popup-ai [text]           - Open window with optional text"
+echo "  popup-ai start            - Start background daemon"
+echo "  popup-ai stop             - Stop background daemon"
+echo "  popup-ai restart          - Restart background daemon"
+echo "  popup-ai status           - Check daemon status"
+echo ""
+echo "The daemon will start automatically when you first run popup-ai."
+echo ""

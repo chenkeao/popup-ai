@@ -52,15 +52,6 @@ desktop_file = configure_file(
   install_dir: datadir / 'applications'
 )
 
-# D-Bus service file
-dbus_service = configure_file(
-  input: 'data' / application_id + '.service.in',
-  output: application_id + '.service',
-  configuration: conf,
-  install: true,
-  install_dir: datadir / 'dbus-1' / 'services'
-)
-
 # GSchema
 install_data(
   'data' / application_id + '.gschema.xml',
@@ -73,12 +64,3 @@ install_data(
   install_dir: datadir / 'icons' / 'hicolor' / 'scalable' / 'apps',
   rename: application_id + '.svg'
 )
-
-# Systemd service (optional, for background running)
-configure_file(
-  input: 'data' / 'popup-ai.service.in',
-  output: 'popup-ai.service',
-  configuration: conf,
-  install: false
-)
-
