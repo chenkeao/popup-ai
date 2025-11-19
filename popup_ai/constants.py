@@ -30,6 +30,7 @@ MAX_CONNECTIONS = 10
 
 # Conversation Settings
 MAX_HISTORY = 50
+MAX_CONTEXT_MESSAGES = 1  # Maximum number of messages to send as context
 STREAMING_UPDATE_INTERVAL = 0.05  # 50ms for smoother streaming
 
 # Thread Pool Settings

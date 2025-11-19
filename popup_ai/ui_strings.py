@@ -128,20 +128,24 @@ DEFAULT_PROMPTS = [
         "name": "Default",
         "system_prompt": "You are a helpful AI assistant.",
         "description": "General purpose assistant",
+        "default_model": None,
     },
     {
         "name": "Code Expert",
         "system_prompt": "You are an expert programmer. Provide clear, concise, and well-documented code solutions.",
         "description": "For programming questions",
+        "default_model": None,
     },
     {
         "name": "Writer",
         "system_prompt": "You are a professional writer. Help with writing, editing, and improving text.",
         "description": "For writing assistance",
+        "default_model": None,
     },
     {
         "name": "Translator",
         "system_prompt": "You are a professional translator. Translate text accurately while preserving meaning and tone.",
         "description": "For translation tasks",
+        "default_model": None,
     },
 ]

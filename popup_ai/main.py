@@ -11,6 +11,11 @@ from popup_ai.daemon import DaemonManager
 
 def run_daemon():
     """Run the application as a daemon service."""
+    import os
+
+    # Force Wayland backend for layer-shell support
+    os.environ["GDK_BACKEND"] = "wayland"
+
     from popup_ai.application import PopupAIApplication
 
     app = PopupAIApplication(service_mode=True)

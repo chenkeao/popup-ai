@@ -25,6 +25,7 @@ from popup_ai.constants import (
     SIDEBAR_WIDTH,
     INPUT_MAX_HEIGHT,
     STREAMING_UPDATE_INTERVAL,
+    MAX_CONTEXT_MESSAGES,
     ASYNC_EXECUTOR_MAX_WORKERS,
     ASYNC_EXECUTOR_THREAD_PREFIX,
     AUTO_FETCH_DELAY_MS,
@@ -219,15 +220,20 @@ class PopupAIWindow(Adw.ApplicationWindow):
 
     def build_ui(self):
         """Build the user interface."""
-        # Main box with horizontal orientation for sidebar + content
-        main_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-        self.set_content(main_box)
+        # Use Paned for resizable sidebar
+        self.paned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
+        self.paned.set_position(self.settings.get("sidebar_width", SIDEBAR_WIDTH))
+        self.paned.set_shrink_start_child(False)
+        self.paned.set_shrink_end_child(False)
+        self.paned.set_resize_start_child(False)
+        self.paned.set_resize_end_child(True)
+        self.set_content(self.paned)
 
         # Sidebar for conversation history
         self.sidebar = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        self.sidebar.set_size_request(SIDEBAR_WIDTH, -1)
+        self.sidebar.set_size_request(200, -1)  # Minimum width
         self.sidebar.add_css_class(CSS_CLASS_SIDEBAR)
-        main_box.append(self.sidebar)
+        self.paned.set_start_child(self.sidebar)
 
         # Sidebar header
         sidebar_header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
@@ -277,7 +283,7 @@ class PopupAIWindow(Adw.ApplicationWindow):
         # Main content box
         content_wrapper = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         content_wrapper.set_hexpand(True)
-        main_box.append(content_wrapper)
+        self.paned.set_end_child(content_wrapper)
 
         # Header bar
         header = Adw.HeaderBar()
@@ -286,25 +292,34 @@ class PopupAIWindow(Adw.ApplicationWindow):
         # Add toggle sidebar button to header
         header.pack_start(self.toggle_sidebar_btn)
 
-        # Model selector
-        self.model_dropdown = Gtk.DropDown()
-        self.model_dropdown.set_tooltip_text(TOOLTIP_SELECT_MODEL)
-        self.update_model_list()
-        self.model_dropdown.connect("notify::selected-item", self.on_model_changed)
-        header.pack_start(self.model_dropdown)
-
-        # Refresh models button
-        refresh_models_btn = Gtk.Button.new_from_icon_name(ICON_REFRESH)
-        refresh_models_btn.set_tooltip_text(TOOLTIP_REFRESH_MODELS)
-        refresh_models_btn.connect("clicked", self.on_refresh_models)
-        header.pack_start(refresh_models_btn)
-
         # Prompt selector
         self.prompt_dropdown = Gtk.DropDown()
         self.prompt_dropdown.set_tooltip_text(TOOLTIP_SELECT_PROMPT)
         self.update_prompt_list()
         self.prompt_dropdown.connect("notify::selected-item", self.on_prompt_changed)
         header.pack_start(self.prompt_dropdown)
+
+        # Model selector with fixed width container
+        model_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        model_box.set_spacing(MARGIN_SMALL)
+        model_box.set_size_request(150, -1)  # Fixed width
+
+        self.model_dropdown = Gtk.DropDown()
+        self.model_dropdown.set_tooltip_text(TOOLTIP_SELECT_MODEL)
+        self.model_dropdown.set_hexpand(True)
+        # Enable ellipsizing for long model names
+        self.model_dropdown.set_enable_search(True)
+        self.update_model_list()
+        self.model_dropdown.connect("notify::selected-item", self.on_model_changed)
+        model_box.append(self.model_dropdown)
+
+        # Refresh models button
+        refresh_models_btn = Gtk.Button.new_from_icon_name(ICON_REFRESH)
+        refresh_models_btn.set_tooltip_text(TOOLTIP_REFRESH_MODELS)
+        refresh_models_btn.connect("clicked", self.on_refresh_models)
+        model_box.append(refresh_models_btn)
+
+        header.pack_start(model_box)
 
         # Menu button
         menu_button = Gtk.MenuButton()
@@ -478,6 +493,13 @@ class PopupAIWindow(Adw.ApplicationWindow):
         if selected_idx < len(self.settings.prompts):
             prompt = self.settings.prompts[selected_idx]
             self.settings.set("selected_prompt", prompt.name)
+
+            # If the prompt has a default model, switch to it
+            if prompt.default_model:
+                for i, model in enumerate(self.settings.models):
+                    if model.name == prompt.default_model:
+                        self.model_dropdown.set_selected(i)
+                        break
 
     def initialize_ai_service(self):
         """Initialize AI service based on selected model."""
@@ -841,9 +863,7 @@ class PopupAIWindow(Adw.ApplicationWindow):
             ">
                 <div>
                     <div style="font-size: {font_size + 20}px; margin-bottom: 20px;">💬</div>
-                    <div>欢迎使用 Popup AI</div>
-                    <div style="font-size: {font_size - 2}px; margin-top: 12px; opacity: 0.7;">在下方输入您的问题开始对话</div>
-                    <div style="font-size: {font_size - 2}px; margin-top: 8px; opacity: 0.6;">提示: 使用 Ctrl+Enter 快速发送</div>
+                    <div>Popup AI</div>
                 </div>
             </div>
             """
@@ -968,10 +988,18 @@ class PopupAIWindow(Adw.ApplicationWindow):
         if selected_idx < len(self.settings.prompts):
             system_prompt = self.settings.prompts[selected_idx].system_prompt
 
-        # Prepare messages
-        messages = [
-            {"role": msg.role, "content": msg.content} for msg in self.current_conversation.messages
-        ]
+        # Prepare messages with context limit
+        all_messages = self.current_conversation.messages
+
+        # Limit context to most recent MAX_CONTEXT_MESSAGES
+        # This prevents excessive token consumption in long conversations
+        if len(all_messages) > MAX_CONTEXT_MESSAGES:
+            messages = [
+                {"role": msg.role, "content": msg.content}
+                for msg in all_messages[-MAX_CONTEXT_MESSAGES:]
+            ]
+        else:
+            messages = [{"role": msg.role, "content": msg.content} for msg in all_messages]
 
         # Add placeholder for streaming message
         self.streaming_content = ""
@@ -1148,6 +1176,10 @@ class PopupAIWindow(Adw.ApplicationWindow):
         width, height = self.get_default_size()
         self.settings.set("window_width", width)
         self.settings.set("window_height", height)
+
+        # Save sidebar width
+        sidebar_width = self.paned.get_position()
+        self.settings.set("sidebar_width", sidebar_width)
 
         # Save current conversation
         if self.current_conversation and self.current_conversation.messages:

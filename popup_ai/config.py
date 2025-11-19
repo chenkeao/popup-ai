@@ -47,6 +47,7 @@ class PromptTemplate(BaseModel):
     name: str
     system_prompt: str
     description: Optional[str] = None
+    default_model: Optional[str] = None
 
 
 class ConversationMessage(BaseModel):

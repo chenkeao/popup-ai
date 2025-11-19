@@ -8,27 +8,28 @@ gi.require_version("Adw", "1")
 from gi.repository import Gtk, Adw
 
 from popup_ai.config import Settings, ModelConfig, PromptTemplate
+from popup_ai.ui_strings import (
+    DIALOG_DELETE_PROMPT_TITLE,
+    DIALOG_DELETE_PROMPT_BODY,
+    ERROR_NO_NAME,
+    ERROR_NO_SYSTEM_PROMPT,
+    ERROR_NAME_EXISTS,
+    NEW_PROMPT_TITLE,
+    EDIT_PROMPT_TITLE,
+    LABEL_NAME,
+    LABEL_DESCRIPTION,
+    LABEL_SYSTEM_PROMPT,
+    LABEL_DEFAULT_MODEL,
+    BTN_SAVE,
+    BTN_CANCEL,
+    PLACEHOLDER_PROMPT_NAME,
+    PLACEHOLDER_DESCRIPTION,
+)
 from popup_ai.constants import (
-    MARGIN_SMALL,
     MARGIN_MEDIUM,
     MARGIN_LARGE,
     SPACING_SMALL,
     SPACING_MEDIUM,
-    SPACING_LARGE,
-    CSS_CLASS_HEADING,
-    CSS_CLASS_SUGGESTED_ACTION,
-    CSS_CLASS_DESTRUCTIVE_ACTION,
-    CSS_CLASS_FLAT,
-    ICON_EDIT,
-    ICON_TRASH,
-    ICON_ADD,
-    ICON_NETWORK,
-    ICON_SCIENCE,
-    ICON_SYSTEM,
-    ICON_GRAPHICS,
-    DEFAULT_UI_FONT,
-    DEFAULT_WEBVIEW_FONT_FAMILY,
-    DEFAULT_WEBVIEW_FONT_SIZE,
 )
 
 
@@ -50,6 +51,9 @@ class PreferencesWindow(Adw.PreferencesWindow):
 
         # Models page
         self.build_models_page()
+
+        # Prompts page
+        self.build_prompts_page()
 
         # Appearance page
         self.build_appearance_page()
@@ -168,27 +172,6 @@ class PreferencesWindow(Adw.PreferencesWindow):
         model_group = Adw.PreferencesGroup()
         model_group.set_title("Default Settings")
         general_page.add(model_group)
-
-        # Default model dropdown
-        default_model_row = Adw.ComboRow()
-        default_model_row.set_title("Default Model")
-        default_model_row.set_subtitle("Model to use when starting a new conversation")
-
-        # Create model list
-        model_list = Gtk.StringList()
-        selected_idx = 0
-        selected_model = self.settings.get("default_model", "")
-
-        for i, model in enumerate(self.settings.models):
-            model_list.append(model.name)
-            if model.name == selected_model:
-                selected_idx = i
-
-        default_model_row.set_model(model_list)
-        default_model_row.set_selected(selected_idx)
-        default_model_row.connect("notify::selected", self.on_default_model_changed)
-        model_group.add(default_model_row)
-        self.default_model_row = default_model_row
 
         # Auto-fetch models
         auto_fetch_row = Adw.SwitchRow()
@@ -338,18 +321,10 @@ class PreferencesWindow(Adw.PreferencesWindow):
         """Handle model deletion."""
         self.settings.remove_model(model_name)
         self.refresh_models_list()
-        self.refresh_default_model_list()
 
         # Notify parent window
         if self.on_settings_changed:
             self.on_settings_changed()
-
-    def on_default_model_changed(self, combo_row, param):
-        """Handle default model selection change."""
-        selected_idx = combo_row.get_selected()
-        if selected_idx < len(self.settings.models):
-            model = self.settings.models[selected_idx]
-            self.settings.set("default_model", model.name)
 
     def on_auto_fetch_changed(self, switch_row, param):
         """Handle auto-fetch models toggle."""
@@ -374,22 +349,145 @@ class PreferencesWindow(Adw.PreferencesWindow):
         """Handle max history change."""
         self.settings.set("max_history", int(spin_row.get_value()))
 
-    def refresh_default_model_list(self):
-        """Refresh the default model dropdown."""
-        if not hasattr(self, "default_model_row"):
-            return
+    def build_prompts_page(self):
+        """Build prompts management page."""
+        prompts_page = Adw.PreferencesPage()
+        prompts_page.set_title("Prompts")
+        prompts_page.set_icon_name("text-x-generic-symbolic")
+        self.add(prompts_page)
 
-        model_list = Gtk.StringList()
-        selected_idx = 0
-        selected_model = self.settings.get("default_model", "")
+        self.prompts_group = Adw.PreferencesGroup()
+        self.prompts_group.set_title("Prompt Templates")
+        self.prompts_group.set_description("Manage your custom prompt templates")
+        prompts_page.add(self.prompts_group)
 
-        for i, model in enumerate(self.settings.models):
-            model_list.append(model.name)
-            if model.name == selected_model:
-                selected_idx = i
+        # Add new prompt button
+        add_prompt_row = Adw.ActionRow()
+        add_prompt_row.set_title("Add New Prompt")
+        add_btn = Gtk.Button()
+        add_btn.set_icon_name("list-add-symbolic")
+        add_btn.set_valign(Gtk.Align.CENTER)
+        add_btn.add_css_class("suggested-action")
+        add_btn.connect("clicked", self.on_add_prompt)
+        add_prompt_row.add_suffix(add_btn)
+        self.prompts_group.add(add_prompt_row)
 
-        self.default_model_row.set_model(model_list)
-        self.default_model_row.set_selected(selected_idx)
+        # Dictionary to track prompt rows
+        self.prompt_rows = {}
+
+        self.refresh_prompts_list()
+
+    def refresh_prompts_list(self):
+        """Refresh the prompts list display."""
+        current_prompts = {p.name: p for p in self.settings.prompts}
+        existing_names = set(self.prompt_rows.keys())
+        new_names = set(current_prompts.keys())
+
+        # Remove deleted prompts
+        for name in existing_names - new_names:
+            row = self.prompt_rows.pop(name)
+            self.prompts_group.remove(row)
+
+        # Add or update prompts
+        for prompt in self.settings.prompts:
+            if prompt.name in self.prompt_rows:
+                # Update existing row
+                row = self.prompt_rows[prompt.name]
+                row.set_title(prompt.name)
+
+                # Update subtitle
+                subtitle_parts = []
+                if prompt.description:
+                    subtitle_parts.append(prompt.description)
+                if prompt.default_model:
+                    subtitle_parts.append(f"Default model: {prompt.default_model}")
+                row.set_subtitle(" | ".join(subtitle_parts) if subtitle_parts else "")
+            else:
+                # Create new row
+                row = self._create_prompt_row(prompt)
+                self.prompt_rows[prompt.name] = row
+                self.prompts_group.add(row)
+
+    def _create_prompt_row(self, prompt):
+        """Create a new prompt row widget."""
+        prompt_row = Adw.ActionRow()
+        prompt_row.set_title(prompt.name)
+
+        # Create subtitle with description and default model
+        subtitle_parts = []
+        if prompt.description:
+            subtitle_parts.append(prompt.description)
+        if prompt.default_model:
+            subtitle_parts.append(f"Default model: {prompt.default_model}")
+        if subtitle_parts:
+            prompt_row.set_subtitle(" | ".join(subtitle_parts))
+
+        # Edit button
+        edit_btn = Gtk.Button()
+        edit_btn.set_icon_name("document-edit-symbolic")
+        edit_btn.set_valign(Gtk.Align.CENTER)
+        edit_btn.add_css_class("flat")
+        edit_btn.set_tooltip_text("Edit Prompt")
+        edit_btn.connect("clicked", self.on_edit_prompt, prompt.name)
+        prompt_row.add_suffix(edit_btn)
+
+        # Delete button
+        delete_btn = Gtk.Button()
+        delete_btn.set_icon_name("user-trash-symbolic")
+        delete_btn.set_valign(Gtk.Align.CENTER)
+        delete_btn.add_css_class("flat")
+        delete_btn.set_tooltip_text("Delete Prompt")
+        delete_btn.connect("clicked", self.on_delete_prompt, prompt.name)
+        prompt_row.add_suffix(delete_btn)
+
+        return prompt_row
+
+    def on_add_prompt(self, button):
+        """Handle add new prompt."""
+
+        def on_save():
+            self.refresh_prompts_list()
+            if self.on_settings_changed:
+                self.on_settings_changed()
+
+        dialog = PromptEditDialog(self, self.settings, None, on_save_callback=on_save)
+        dialog.present()
+
+    def on_edit_prompt(self, button, prompt_name):
+        """Handle edit prompt."""
+        prompt = self.settings.get_prompt(prompt_name)
+        if prompt:
+
+            def on_save():
+                self.refresh_prompts_list()
+                if self.on_settings_changed:
+                    self.on_settings_changed()
+
+            dialog = PromptEditDialog(self, self.settings, prompt, on_save_callback=on_save)
+            dialog.present()
+
+    def on_delete_prompt(self, button, prompt_name):
+        """Handle delete prompt."""
+        # Show confirmation dialog
+        dialog = Adw.MessageDialog.new(self)
+        dialog.set_heading(DIALOG_DELETE_PROMPT_TITLE)
+        dialog.set_body(DIALOG_DELETE_PROMPT_BODY.format(name=prompt_name))
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("delete", "Delete")
+        dialog.set_response_appearance("delete", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.set_default_response("cancel")
+        dialog.set_close_response("cancel")
+
+        def on_response(dlg, response):
+            if response == "delete":
+                self.settings.remove_prompt(prompt_name)
+                self.refresh_prompts_list()
+                # Notify parent to update UI
+                if self.on_settings_changed:
+                    self.on_settings_changed()
+
+        dialog.connect("response", on_response)
+        dialog.present()
 
     def on_ui_font_changed(self, font_button):
         """Handle UI font change."""
@@ -443,6 +541,202 @@ class PreferencesWindow(Adw.PreferencesWindow):
         # Notify parent to update UI
         if self.on_settings_changed:
             self.on_settings_changed()
+
+    def show_error(self, message: str):
+        """Show an error dialog."""
+        dialog = Adw.MessageDialog.new(self)
+        dialog.set_heading("Error")
+        dialog.set_body(message)
+        dialog.add_response("ok", "OK")
+        dialog.present()
+
+
+class PromptEditDialog(Adw.Window):
+    """Dialog for editing or creating prompts."""
+
+    def __init__(
+        self, parent, settings: Settings, prompt: PromptTemplate = None, on_save_callback=None
+    ):
+        super().__init__(transient_for=parent, modal=True)
+
+        self.settings = settings
+        self.prompt = prompt
+        self.is_edit = prompt is not None
+        self.on_save_callback = on_save_callback
+
+        self.set_title(EDIT_PROMPT_TITLE if self.is_edit else NEW_PROMPT_TITLE)
+        self.set_default_size(500, 550)
+
+        # Main box
+        main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.set_content(main_box)
+
+        # Header bar
+        header = Adw.HeaderBar()
+        main_box.append(header)
+
+        # Cancel button
+        cancel_btn = Gtk.Button(label=BTN_CANCEL)
+        cancel_btn.connect("clicked", self.on_cancel)
+        header.pack_start(cancel_btn)
+
+        # Save button
+        save_btn = Gtk.Button(label=BTN_SAVE)
+        save_btn.add_css_class("suggested-action")
+        save_btn.connect("clicked", self.on_save)
+        header.pack_end(save_btn)
+
+        # Scrolled window for content
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_vexpand(True)
+        scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        main_box.append(scrolled)
+
+        # Content box
+        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        content_box.set_margin_start(MARGIN_LARGE)
+        content_box.set_margin_end(MARGIN_LARGE)
+        content_box.set_margin_top(MARGIN_LARGE)
+        content_box.set_margin_bottom(MARGIN_LARGE)
+        content_box.set_spacing(SPACING_MEDIUM)
+        scrolled.set_child(content_box)
+
+        # Name entry
+        name_label = Gtk.Label(label=LABEL_NAME)
+        name_label.set_halign(Gtk.Align.START)
+        name_label.add_css_class("heading")
+        content_box.append(name_label)
+
+        self.name_entry = Gtk.Entry()
+        self.name_entry.set_placeholder_text(PLACEHOLDER_PROMPT_NAME)
+        if self.is_edit:
+            self.name_entry.set_text(prompt.name)
+        content_box.append(self.name_entry)
+
+        # Description entry
+        desc_label = Gtk.Label(label=LABEL_DESCRIPTION)
+        desc_label.set_halign(Gtk.Align.START)
+        desc_label.add_css_class("heading")
+        desc_label.set_margin_top(MARGIN_MEDIUM)
+        content_box.append(desc_label)
+
+        self.desc_entry = Gtk.Entry()
+        self.desc_entry.set_placeholder_text(PLACEHOLDER_DESCRIPTION)
+        if self.is_edit and prompt.description:
+            self.desc_entry.set_text(prompt.description)
+        content_box.append(self.desc_entry)
+
+        # Default model dropdown
+        model_label = Gtk.Label(label=LABEL_DEFAULT_MODEL)
+        model_label.set_halign(Gtk.Align.START)
+        model_label.add_css_class("heading")
+        model_label.set_margin_top(MARGIN_MEDIUM)
+        content_box.append(model_label)
+
+        model_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        model_box.set_spacing(SPACING_SMALL)
+        content_box.append(model_box)
+
+        self.model_dropdown = Gtk.DropDown()
+        self.model_dropdown.set_hexpand(True)
+
+        # Create model list with "None" option
+        model_list = Gtk.StringList()
+        model_list.append("(None)")
+
+        selected_idx = 0
+        if self.is_edit and prompt.default_model:
+            for i, model in enumerate(settings.models):
+                model_list.append(model.name)
+                if model.name == prompt.default_model:
+                    selected_idx = i + 1  # +1 because of "(None)" option
+        else:
+            for model in settings.models:
+                model_list.append(model.name)
+
+        self.model_dropdown.set_model(model_list)
+        self.model_dropdown.set_selected(selected_idx)
+        model_box.append(self.model_dropdown)
+
+        # System prompt
+        prompt_label = Gtk.Label(label=LABEL_SYSTEM_PROMPT)
+        prompt_label.set_halign(Gtk.Align.START)
+        prompt_label.add_css_class("heading")
+        prompt_label.set_margin_top(MARGIN_MEDIUM)
+        content_box.append(prompt_label)
+
+        # Text view for system prompt
+        prompt_scroll = Gtk.ScrolledWindow()
+        prompt_scroll.set_min_content_height(200)
+        prompt_scroll.set_vexpand(True)
+        content_box.append(prompt_scroll)
+
+        self.prompt_text = Gtk.TextView()
+        self.prompt_text.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
+        self.prompt_text.add_css_class("card")
+        self.prompt_text.set_left_margin(MARGIN_MEDIUM)
+        self.prompt_text.set_right_margin(MARGIN_MEDIUM)
+        self.prompt_text.set_top_margin(MARGIN_MEDIUM)
+        self.prompt_text.set_bottom_margin(MARGIN_MEDIUM)
+        if self.is_edit:
+            self.prompt_text.get_buffer().set_text(prompt.system_prompt)
+        prompt_scroll.set_child(self.prompt_text)
+
+    def on_cancel(self, button):
+        """Handle cancel button."""
+        self.close()
+
+    def on_save(self, button):
+        """Handle save button."""
+        name = self.name_entry.get_text().strip()
+        if not name:
+            self.show_error(ERROR_NO_NAME)
+            return
+
+        # Check if name already exists (and it's not the current prompt being edited)
+        if not self.is_edit or name != self.prompt.name:
+            if self.settings.get_prompt(name):
+                self.show_error(ERROR_NAME_EXISTS.format(name=name))
+                return
+
+        buffer = self.prompt_text.get_buffer()
+        system_prompt = buffer.get_text(
+            buffer.get_start_iter(), buffer.get_end_iter(), False
+        ).strip()
+
+        if not system_prompt:
+            self.show_error(ERROR_NO_SYSTEM_PROMPT)
+            return
+
+        description = self.desc_entry.get_text().strip()
+        if not description:
+            description = None
+
+        # Get selected model
+        selected_idx = self.model_dropdown.get_selected()
+        default_model = None
+        if selected_idx > 0:  # 0 is "(None)"
+            default_model = self.settings.models[selected_idx - 1].name
+
+        # Create or update prompt
+        new_prompt = PromptTemplate(
+            name=name,
+            system_prompt=system_prompt,
+            description=description,
+            default_model=default_model,
+        )
+
+        # If editing and name changed, remove old prompt
+        if self.is_edit and name != self.prompt.name:
+            self.settings.remove_prompt(self.prompt.name)
+
+        self.settings.add_prompt(new_prompt)
+
+        # Call callback if provided
+        if self.on_save_callback:
+            self.on_save_callback()
+
+        self.close()
 
     def show_error(self, message: str):
         """Show an error dialog."""
