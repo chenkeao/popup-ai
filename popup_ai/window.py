@@ -3,7 +3,6 @@
 import time
 import uuid
 import asyncio
-import logging
 from typing import Optional
 from concurrent.futures import ThreadPoolExecutor
 
@@ -19,6 +18,7 @@ from popup_ai.config import Settings, Conversation, ConversationMessage, ModelCo
 from popup_ai.ai_service import create_ai_service, AIService, fetch_available_models
 from popup_ai.preferences import PreferencesWindow
 from popup_ai.html_template import generate_html_template
+from popup_ai.logger import get_logger
 from popup_ai.constants import (
     DEFAULT_WINDOW_WIDTH,
     DEFAULT_WINDOW_HEIGHT,
@@ -76,8 +76,7 @@ from popup_ai.ui_strings import (
 )
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class AsyncExecutor:
@@ -137,6 +136,8 @@ class PopupAIWindow(Adw.ApplicationWindow):
 
     def __init__(self, application, settings: Settings, service_mode: bool = False):
         super().__init__(application=application, title=WINDOW_TITLE)
+
+        logger.info(f"Initializing PopupAI window (service_mode={service_mode})")
 
         self.settings = settings
         self.service_mode = service_mode
@@ -517,6 +518,8 @@ class PopupAIWindow(Adw.ApplicationWindow):
 
         model_config = self.settings.models[selected_idx]
 
+        logger.info(f"Initializing AI service: {model_config.type} - {model_config.name}")
+
         try:
             self.ai_service = create_ai_service(
                 model_type=model_config.type,
@@ -524,8 +527,9 @@ class PopupAIWindow(Adw.ApplicationWindow):
                 model=model_config.model_id,
                 api_key=model_config.api_key,
             )
+            logger.info(f"AI service initialized successfully: {model_config.name}")
         except Exception as e:
-            logger.error(f"Failed to initialize AI service: {e}")
+            logger.error(f"Failed to initialize AI service: {e}", exc_info=True)
             self.show_error(ERROR_INIT_AI_SERVICE.format(error=e))
 
     def load_state(self):
@@ -953,8 +957,11 @@ class PopupAIWindow(Adw.ApplicationWindow):
 
         # Check if AI service is initialized
         if not self.ai_service:
+            logger.warning("Send attempted without AI service initialized")
             self.show_error(ERROR_NO_MODEL)
             return
+
+        logger.info(f"User message sent: {text[:100]}{'...' if len(text) > 100 else ''}")
 
         # Clear input
         buffer.set_text("")
@@ -979,11 +986,15 @@ class PopupAIWindow(Adw.ApplicationWindow):
     def generate_response(self):
         """Generate AI response."""
         if not self.ai_service:
+            logger.error("Generate response called without AI service")
             self.show_error(ERROR_NO_AI_SERVICE)
             return
 
         if not self.current_conversation or not self.current_conversation.messages:
+            logger.warning("Generate response called without conversation or messages")
             return
+
+        logger.info("Starting AI response generation")
 
         # Show stop button, hide send button
         self.is_generating = True
@@ -1061,7 +1072,7 @@ class PopupAIWindow(Adw.ApplicationWindow):
                 GLib.idle_add(self.load_conversation_history)
 
         except Exception as e:
-            logger.error(f"Error generating response: {e}")
+            logger.error(f"Error generating response: {e}", exc_info=True)
             GLib.idle_add(self.show_error, ERROR_GENERATE_RESPONSE.format(error=e))
 
         finally:

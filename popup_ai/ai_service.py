@@ -2,7 +2,7 @@
 
 import asyncio
 import json
-import logging
+import time
 from abc import ABC, abstractmethod
 from typing import AsyncIterator, Dict, List, Optional
 
@@ -13,10 +13,10 @@ from popup_ai.constants import (
     MAX_KEEPALIVE_CONNECTIONS,
     MAX_CONNECTIONS,
 )
+from popup_ai.logger import get_logger, log_ai_request, log_ai_response, log_ai_stream_chunk
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class AIService(ABC):
@@ -78,8 +78,22 @@ class OllamaService(AIService):
 
         formatted_messages.extend(messages)
 
+        # Log request
+        log_ai_request(
+            model=self.model,
+            endpoint=self.endpoint,
+            messages=messages,
+            system_prompt=system_prompt,
+            metadata={"service": "ollama"},
+        )
+
         # Create cancel event
         self._cancel_event = asyncio.Event()
+
+        start_time = time.time()
+        full_response = ""
+        chunk_count = 0
+        error_msg = None
 
         try:
             async with self.client.stream(
@@ -95,6 +109,7 @@ class OllamaService(AIService):
 
                 async for line in response.aiter_lines():
                     if self._cancel_event.is_set():
+                        logger.info(f"Ollama request cancelled: {self.model}")
                         return  # Use return instead of break to exit generator properly
 
                     if not line:
@@ -105,12 +120,44 @@ class OllamaService(AIService):
                         if "message" in data and "content" in data["message"]:
                             content = data["message"]["content"]
                             if content:
+                                full_response += content
+                                chunk_count += 1
+                                log_ai_stream_chunk(
+                                    model=self.model,
+                                    chunk_num=chunk_count,
+                                    chunk_size=len(content),
+                                    total_size=len(full_response),
+                                )
                                 yield content
 
                         if data.get("done", False):
-                            return  # Use return instead of break
+                            break
                     except json.JSONDecodeError:
                         continue
+
+            # Log successful response
+            duration = time.time() - start_time
+            log_ai_response(
+                model=self.model,
+                response=full_response,
+                duration=duration,
+                success=True,
+                metadata={"service": "ollama", "chunks": chunk_count},
+            )
+
+        except Exception as e:
+            error_msg = str(e)
+            duration = time.time() - start_time
+            logger.error(f"Ollama streaming error: {e}")
+            log_ai_response(
+                model=self.model,
+                response=full_response,
+                duration=duration,
+                success=False,
+                error=error_msg,
+                metadata={"service": "ollama"},
+            )
+            raise
         finally:
             self._cancel_event = None
 
@@ -171,8 +218,22 @@ class OpenAICompatibleService(AIService):
 
         formatted_messages.extend(messages)
 
+        # Log request
+        log_ai_request(
+            model=self.model,
+            endpoint=self.endpoint,
+            messages=messages,
+            system_prompt=system_prompt,
+            metadata={"service": "openai_compatible"},
+        )
+
         # Create cancel event
         self._cancel_event = asyncio.Event()
+
+        start_time = time.time()
+        full_response = ""
+        chunk_count = 0
+        error_msg = None
 
         try:
             async with self.client.stream(
@@ -188,13 +249,14 @@ class OpenAICompatibleService(AIService):
 
                 async for line in response.aiter_lines():
                     if self._cancel_event.is_set():
+                        logger.info(f"OpenAI-compatible request cancelled: {self.model}")
                         return  # Use return instead of break to exit generator properly
 
                     if not line or not line.startswith("data: "):
                         continue
 
                     if line == "data: [DONE]":
-                        return  # Use return instead of break
+                        break
 
                     try:
                         data = json.loads(line[6:])  # Remove "data: " prefix
@@ -202,9 +264,41 @@ class OpenAICompatibleService(AIService):
                             delta = data["choices"][0].get("delta", {})
                             content = delta.get("content")
                             if content:
+                                full_response += content
+                                chunk_count += 1
+                                log_ai_stream_chunk(
+                                    model=self.model,
+                                    chunk_num=chunk_count,
+                                    chunk_size=len(content),
+                                    total_size=len(full_response),
+                                )
                                 yield content
                     except json.JSONDecodeError:
                         continue
+
+            # Log successful response
+            duration = time.time() - start_time
+            log_ai_response(
+                model=self.model,
+                response=full_response,
+                duration=duration,
+                success=True,
+                metadata={"service": "openai_compatible", "chunks": chunk_count},
+            )
+
+        except Exception as e:
+            error_msg = str(e)
+            duration = time.time() - start_time
+            logger.error(f"OpenAI-compatible streaming error: {e}")
+            log_ai_response(
+                model=self.model,
+                response=full_response,
+                duration=duration,
+                success=False,
+                error=error_msg,
+                metadata={"service": "openai_compatible"},
+            )
+            raise
         finally:
             self._cancel_event = None
 

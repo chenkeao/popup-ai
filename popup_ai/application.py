@@ -9,6 +9,7 @@ gi.require_version("Gdk", "4.0")
 from gi.repository import Gtk, Adw, Gio, GLib, Gdk
 from popup_ai.window import PopupAIWindow
 from popup_ai.config import Settings
+from popup_ai.logger import setup_logging, get_logger
 from popup_ai.constants import (
     APP_ID,
     APP_NAME,
@@ -31,6 +32,9 @@ DBUS_INTERFACE = """
 </node>
 """
 
+# Initialize logger
+logger = get_logger(__name__)
+
 
 class PopupAIApplication(Adw.Application):
     """Main application class."""
@@ -44,6 +48,10 @@ class PopupAIApplication(Adw.Application):
                 else Gio.ApplicationFlags.HANDLES_COMMAND_LINE
             ),
         )
+        # Setup logging first
+        setup_logging()
+        logger.info(f"Initializing {APP_NAME} v{APP_VERSION} (service_mode={service_mode})")
+
         self.initial_text = initial_text
         self.window = None
         self.settings = Settings()
