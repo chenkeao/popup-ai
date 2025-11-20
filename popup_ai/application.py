@@ -62,7 +62,8 @@ class PopupAIApplication(Adw.Application):
                     self.window = None
                 else:
                     self.window.unminimize()
-                    self.window.present_with_time(GLib.get_monotonic_time() // 1000)
+                    self.window.preset()
+                    # self.window.present_with_time(GLib.get_monotonic_time() // 1000)
 
                     if initial_text:
                         self.window.set_initial_text(initial_text)

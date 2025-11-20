@@ -31,10 +31,6 @@ from popup_ai.constants import (
     AUTO_FETCH_DELAY_MS,
     MARGIN_SMALL,
     MARGIN_MEDIUM,
-    MARGIN_LARGE,
-    SPACING_SMALL,
-    SPACING_MEDIUM,
-    SPACING_LARGE,
     CSS_CLASS_SIDEBAR,
     CSS_CLASS_NAVIGATION_SIDEBAR,
     CSS_CLASS_CARD,
@@ -357,10 +353,20 @@ class PopupAIWindow(Adw.ApplicationWindow):
         self.webview.set_vexpand(True)
         self.webview.set_hexpand(True)
 
-        # Enable dark mode support
+        # Optimize WebKit settings for better performance
         webkit_settings = self.webview.get_settings()
-        webkit_settings.set_enable_write_console_messages_to_stdout(True)
+        webkit_settings.set_enable_write_console_messages_to_stdout(
+            False
+        )  # Disable console logging for performance
         webkit_settings.set_enable_developer_extras(False)
+        webkit_settings.set_hardware_acceleration_policy(
+            WebKit.HardwareAccelerationPolicy.ALWAYS
+        )  # Enable hardware acceleration
+        webkit_settings.set_enable_page_cache(False)  # Disable page cache to avoid stale content
+        webkit_settings.set_enable_smooth_scrolling(True)  # Enable smooth scrolling
+        webkit_settings.set_javascript_can_access_clipboard(
+            True
+        )  # Allow clipboard access for copy functionality
 
         # Set background color to support transparency
         self.webview.set_background_color(Gdk.RGBA(0, 0, 0, 0))
@@ -375,8 +381,10 @@ class PopupAIWindow(Adw.ApplicationWindow):
 
         scrolled.set_child(self.webview)
 
-        # Initialize with empty HTML
-        self._update_webview()
+        # Pre-load initial HTML template to avoid delay
+        initial_html = self._generate_html()
+        self.webview.load_html(initial_html, "file:///")
+        self._last_html_hash = hash(initial_html)
 
         # Input area
         input_frame = Adw.Clamp()
@@ -783,7 +791,6 @@ class PopupAIWindow(Adw.ApplicationWindow):
             content: The new content to display
         """
         import markdown
-        import html as html_module
         import json
 
         # Convert markdown to HTML
@@ -804,11 +811,14 @@ class PopupAIWindow(Adw.ApplicationWindow):
                 lastMessage.innerHTML = {escaped_content};
                 lastMessage.setAttribute('data-raw', {escaped_raw});
                 
-                // Re-render MathJax if available
+                // Re-render MathJax if available (debounced)
                 if (typeof MathJax !== 'undefined' && MathJax.typesetPromise) {{
-                    MathJax.typesetPromise([lastMessage]).catch(function(err) {{
-                        console.error('MathJax error:', err);
-                    }});
+                    if (window.mathJaxTimeout) clearTimeout(window.mathJaxTimeout);
+                    window.mathJaxTimeout = setTimeout(function() {{
+                        MathJax.typesetPromise([lastMessage]).catch(function(err) {{
+                            console.error('MathJax error:', err);
+                        }});
+                    }}, 100);
                 }}
                 
                 // Auto-scroll if user hasn't scrolled manually
@@ -827,8 +837,6 @@ class PopupAIWindow(Adw.ApplicationWindow):
             self.webview.evaluate_javascript(js_code, -1, None, None, None)
         except Exception as e:
             logger.warning(f"Failed to update streaming content via JS: {e}")
-            # Fallback to full reload if JS fails
-            self._update_webview(force=True)
 
     def _generate_html(self) -> str:
         """Generate HTML for the conversation."""
@@ -927,8 +935,8 @@ class PopupAIWindow(Adw.ApplicationWindow):
         if role == "user" and len(self.current_conversation.messages) == 1:
             self.current_conversation.title = content[:50] + ("..." if len(content) > 50 else "")
 
-        # Update the webview
-        self._update_webview()
+        # Force update to ensure new message is displayed immediately
+        self._update_webview(force=True)
 
     def on_send(self, button):
         """Handle send button click."""
@@ -991,8 +999,6 @@ class PopupAIWindow(Adw.ApplicationWindow):
         # Prepare messages with context limit
         all_messages = self.current_conversation.messages
 
-        # Limit context to most recent MAX_CONTEXT_MESSAGES
-        # This prevents excessive token consumption in long conversations
         if len(all_messages) > MAX_CONTEXT_MESSAGES:
             messages = [
                 {"role": msg.role, "content": msg.content}
@@ -1005,11 +1011,12 @@ class PopupAIWindow(Adw.ApplicationWindow):
         self.streaming_content = ""
         placeholder_msg = ConversationMessage(
             role="assistant",
-            content="",
+            content="...",  # Add loading indicator
             timestamp=time.time(),
         )
         self.current_conversation.messages.append(placeholder_msg)
-        self._update_webview()
+        # Force update to show user message and placeholder immediately
+        self._update_webview(force=True)
 
         # Run async task using shared executor
         self.async_executor.run_async(self.stream_response(messages, system_prompt))
@@ -1017,8 +1024,8 @@ class PopupAIWindow(Adw.ApplicationWindow):
     async def stream_response(self, messages, system_prompt):
         """Stream AI response."""
         full_response = ""
-        last_update_time = 0
-        update_interval = STREAMING_UPDATE_INTERVAL  # Update UI every 50ms for smoother streaming
+        chunk_count = 0
+        update_frequency = 3  # Update every N chunks instead of time-based
 
         # Reset scroll flag for new generation
         self.user_scrolled = False
@@ -1029,22 +1036,23 @@ class PopupAIWindow(Adw.ApplicationWindow):
                     break
 
                 full_response += chunk
+                chunk_count += 1
 
-                # Throttle UI updates to reduce scrolling jitter
-                current_time = time.time()
-                if current_time - last_update_time >= update_interval:
+                # Update UI every N chunks for consistent performance
+                if chunk_count >= update_frequency:
                     # Update the last message in conversation
                     if self.current_conversation and self.current_conversation.messages:
                         self.current_conversation.messages[-1].content = full_response
                         # Use JavaScript to update content without reloading entire page
                         GLib.idle_add(self._update_streaming_content, full_response)
-                    last_update_time = current_time
+                    chunk_count = 0
 
             # Final update with complete response
             if full_response and self.current_conversation:
                 self.current_conversation.messages[-1].content = full_response
                 self.current_conversation.updated_at = time.time()
-                GLib.idle_add(self._update_webview, True)  # Force final render
+                # Only update via JavaScript for final render, no need to reload HTML
+                GLib.idle_add(self._update_streaming_content, full_response)
 
                 # Save conversation
                 self.settings.save_conversation(self.current_conversation)

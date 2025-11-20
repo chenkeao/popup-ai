@@ -8,22 +8,25 @@ def get_mathjax_config() -> str:
     return r"""
     window.MathJax = {
         tex: {
-            inlineMath: [['$', '$'], ['\(', '\)']],
-            displayMath: [['$$', '$$'], ['\[', '\]']],
+            inlineMath: [['$', '$'], ['\\(', '\\)']],
+            displayMath: [['$$', '$$'], ['\\[', '\\]']],
             processEscapes: true,
             processEnvironments: true,
             tags: 'ams'
         },
         options: {
             skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
-            ignoreHtmlClass: 'no-mathjax'
+            ignoreHtmlClass: 'no-mathjax',
+            renderActions: {
+                addMenu: []  // Disable MathJax context menu for better performance
+            }
         },
         startup: {
             ready: () => {
                 MathJax.startup.defaultReady();
-                MathJax.startup.promise.then(() => {
-                    console.log('MathJax is ready');
-                });
+            },
+            pageReady: () => {
+                return MathJax.startup.defaultPageReady();
             }
         }
     };
@@ -301,41 +304,57 @@ def get_conversation_scripts(user_scrolled: bool) -> str:
                             }}, 1000);
                         }}
                     }}).catch(function(err) {{
-                        console.error('复制失败:', err);
+                        console.error('Copy failed:', err);
                     }});
                 }}
             }}
         }}
         
-        // Trigger MathJax to render math
-        if (typeof MathJax !== 'undefined' && MathJax.typesetPromise) {{
-            MathJax.typesetPromise().catch(function(err) {{
-                console.error('MathJax error:', err);
-            }});
+        // Debounced MathJax typesetting
+        var mathJaxPending = false;
+        function triggerMathJax() {{
+            if (typeof MathJax !== 'undefined' && MathJax.typesetPromise && !mathJaxPending) {{
+                mathJaxPending = true;
+                MathJax.typesetPromise().catch(function(err) {{
+                    console.error('MathJax error:', err);
+                }}).finally(function() {{
+                    mathJaxPending = false;
+                }});
+            }}
         }}
         
-        // Save scroll position before unload
+        // Trigger MathJax after DOM is ready
+        if (document.readyState === 'loading') {{
+            document.addEventListener('DOMContentLoaded', triggerMathJax);
+        }} else {{
+            triggerMathJax();
+        }}
+        
+        // Save scroll position
         var scrollPos = sessionStorage.getItem('scrollPos');
         var userScrolledFlag = {str(user_scrolled).lower()};
         
-        // Notify Python when user manually scrolls
+        // Notify Python when user manually scrolls (throttled)
+        var scrollTimeout;
         window.addEventListener('scroll', function() {{
-            // Save current position
             sessionStorage.setItem('scrollPos', window.scrollY);
             
-            // Notify Python about scroll
-            if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.scrolled) {{
-                window.webkit.messageHandlers.scrolled.postMessage('scroll');
-            }}
+            if (scrollTimeout) clearTimeout(scrollTimeout);
+            scrollTimeout = setTimeout(function() {{
+                if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.scrolled) {{
+                    window.webkit.messageHandlers.scrolled.postMessage('scroll');
+                }}
+            }}, 150);
         }}, {{ passive: true }});
         
         // Restore position or auto-scroll
         if (userScrolledFlag && scrollPos !== null) {{
-            // User scrolled - restore their position
             window.scrollTo(0, parseInt(scrollPos));
         }} else {{
-            // Auto-scroll to bottom
-            document.getElementById('scroll-anchor').scrollIntoView({{block: 'end'}});
+            var anchor = document.getElementById('scroll-anchor');
+            if (anchor) {{
+                anchor.scrollIntoView({{block: 'end'}});
+            }}
             sessionStorage.setItem('scrollPos', window.scrollY);
         }}
     """
@@ -365,11 +384,13 @@ def generate_html_template(
 <html>
 <head>
     <meta charset="utf-8">
-    <!-- MathJax for LaTeX rendering -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- MathJax configuration -->
     <script>
     {mathjax_config}
     </script>
-    <script src="{MATHJAX_CDN_URL}"></script>
+    <!-- Load MathJax asynchronously for better performance -->
+    <script async src="{MATHJAX_CDN_URL}"></script>
     <style>
         {styles}
     </style>
