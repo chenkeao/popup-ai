@@ -3,6 +3,8 @@
 import time
 import uuid
 import asyncio
+import threading
+from pathlib import Path
 from typing import Optional
 from concurrent.futures import ThreadPoolExecutor
 
@@ -80,10 +82,9 @@ logger = get_logger(__name__)
 
 
 class AsyncExecutor:
-    """Shared async executor for running async tasks in background threads."""
+    """Shared async executor for running async tasks in a background thread."""
 
     _instance = None
-    _executor = None
 
     @classmethod
     def get_instance(cls):
@@ -94,41 +95,43 @@ class AsyncExecutor:
 
     def __init__(self):
         """Initialize executor."""
-        if AsyncExecutor._executor is None:
-            AsyncExecutor._executor = ThreadPoolExecutor(
-                max_workers=ASYNC_EXECUTOR_MAX_WORKERS,
-                thread_name_prefix=ASYNC_EXECUTOR_THREAD_PREFIX,
-            )
+        self._loop = asyncio.new_event_loop()
+        self._thread = threading.Thread(
+            target=self._run_loop,
+            name=f"{ASYNC_EXECUTOR_THREAD_PREFIX}-Loop",
+            daemon=True,
+        )
+        self._thread.start()
+
+    def _run_loop(self):
+        """Run the event loop."""
+        asyncio.set_event_loop(self._loop)
+        try:
+            self._loop.run_forever()
+        finally:
+            # Cancel all running tasks
+            try:
+                pending = asyncio.all_tasks(self._loop)
+                for task in pending:
+                    task.cancel()
+                if pending:
+                    self._loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                self._loop.run_until_complete(self._loop.shutdown_asyncgens())
+            except Exception as e:
+                logger.error(f"Error cleaning up event loop: {e}")
+            finally:
+                self._loop.close()
 
     def run_async(self, coro):
-        """Run a coroutine in a background thread with proper cleanup."""
+        """Run a coroutine in the background thread."""
+        return asyncio.run_coroutine_threadsafe(coro, self._loop)
 
-        def run_in_thread():
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                return loop.run_until_complete(coro)
-            finally:
-                try:
-                    loop.run_until_complete(loop.shutdown_asyncgens())
-                    pending = asyncio.all_tasks(loop)
-                    for task in pending:
-                        task.cancel()
-                    if pending:
-                        loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-                except Exception as e:
-                    logger.error(f"Error cleaning up event loop: {e}")
-                finally:
-                    loop.close()
-
-        return self._executor.submit(run_in_thread)
-
-    @classmethod
-    def shutdown(cls):
+    def shutdown(self):
         """Shutdown the executor."""
-        if cls._executor:
-            cls._executor.shutdown(wait=False)
-            cls._executor = None
+        if self._loop.is_running():
+            self._loop.call_soon_threadsafe(self._loop.stop)
+        if self._thread.is_alive():
+            self._thread.join(timeout=1.0)
 
 
 class PopupAIWindow(Adw.ApplicationWindow):
@@ -173,8 +176,6 @@ class PopupAIWindow(Adw.ApplicationWindow):
     def _load_css(self):
         """Load custom CSS styles."""
         try:
-            from pathlib import Path
-
             # Load custom CSS file if exists
             css_file = Path(__file__).parent / "style.css"
             if css_file.exists():
@@ -195,6 +196,11 @@ class PopupAIWindow(Adw.ApplicationWindow):
             # Get UI font settings
             ui_font = self.settings.get("ui_font_family", "Sans 11")
 
+            # Check if font changed
+            if hasattr(self, "_current_ui_font") and self._current_ui_font == ui_font:
+                return
+            self._current_ui_font = ui_font
+
             # Create dynamic CSS for UI font
             css_data = f"""
             window {{
@@ -205,13 +211,13 @@ class PopupAIWindow(Adw.ApplicationWindow):
             # Create or update the font CSS provider
             if not hasattr(self, "_font_css_provider"):
                 self._font_css_provider = Gtk.CssProvider()
+                Gtk.StyleContext.add_provider_for_display(
+                    Gdk.Display.get_default(),
+                    self._font_css_provider,
+                    Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION + 1,
+                )
 
             self._font_css_provider.load_from_data(css_data.encode())
-            Gtk.StyleContext.add_provider_for_display(
-                Gdk.Display.get_default(),
-                self._font_css_provider,
-                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION + 1,
-            )
         except Exception as e:
             logger.warning(f"Failed to apply UI font: {e}")
 
@@ -631,7 +637,7 @@ class PopupAIWindow(Adw.ApplicationWindow):
             # update_model_list will call initialize_ai_service
 
     def load_conversation_history(self):
-        """Load conversation history into sidebar."""
+        """Load conversation history into si    debar."""
         # Clear existing items
         child = self.conv_list_box.get_first_child()
         while child:
@@ -900,15 +906,13 @@ class PopupAIWindow(Adw.ApplicationWindow):
                 if msg.tokens_input is not None or msg.tokens_output is not None:
                     token_parts = []
                     if msg.tokens_input is not None:
-                        token_parts.append(f"输入: {msg.tokens_input:,}")
+                        token_parts.append(f"Input: {msg.tokens_input:,}")
                     if msg.tokens_output is not None:
-                        token_parts.append(f"输出: {msg.tokens_output:,}")
+                        token_parts.append(f"Output: {msg.tokens_output:,}")
                     if msg.tokens_input is not None and msg.tokens_output is not None:
                         total = msg.tokens_input + msg.tokens_output
-                        token_parts.append(f"总计: {total:,}")
-                    token_info_html = (
-                        f'<span class="token-info">🎫 {" | ".join(token_parts)}</span>'
-                    )
+                        token_parts.append(f"Total: {total:,}")
+                    token_info_html = f'<span class="token-info">{" | ".join(token_parts)}</span>'
 
                 messages_html += f"""
                 <div class="message {role_class}">
@@ -941,6 +945,10 @@ class PopupAIWindow(Adw.ApplicationWindow):
         """Add a message to the current conversation."""
         if not self.current_conversation:
             self.start_new_conversation()
+
+        # Ensure conversation exists for type checker
+        if not self.current_conversation:
+            return
 
         message = ConversationMessage(
             role=role,
@@ -1005,7 +1013,9 @@ class PopupAIWindow(Adw.ApplicationWindow):
             self.show_error(ERROR_NO_AI_SERVICE)
             return
 
-        if not self.current_conversation or not self.current_conversation.messages:
+        # Capture current conversation to local variable for type narrowing
+        conversation = self.current_conversation
+        if not conversation or not conversation.messages:
             logger.warning("Generate response called without conversation or messages")
             return
 
@@ -1023,7 +1033,7 @@ class PopupAIWindow(Adw.ApplicationWindow):
             system_prompt = self.settings.prompts[selected_idx].system_prompt
 
         # Prepare messages with context limit
-        all_messages = self.current_conversation.messages
+        all_messages = conversation.messages
 
         if len(all_messages) > MAX_CONTEXT_MESSAGES:
             messages = [
@@ -1040,7 +1050,7 @@ class PopupAIWindow(Adw.ApplicationWindow):
             content="...",  # Add loading indicator
             timestamp=time.time(),
         )
-        self.current_conversation.messages.append(placeholder_msg)
+        conversation.messages.append(placeholder_msg)
         # Force update to show user message and placeholder immediately
         self._update_webview(force=True)
 
@@ -1049,23 +1059,30 @@ class PopupAIWindow(Adw.ApplicationWindow):
 
     async def stream_response(self, messages, system_prompt):
         """Stream AI response."""
-        full_response = ""
+        response_chunks = []
         chunk_count = 0
         update_frequency = 3  # Update every N chunks instead of time-based
+
+        # Capture the service instance to avoid race conditions if settings change
+        ai_service = self.ai_service
+        if not ai_service:
+            logger.error("Stream response called without AI service")
+            return
 
         # Reset scroll flag for new generation
         self.user_scrolled = False
 
         try:
-            async for chunk in self.ai_service.stream_completion(messages, system_prompt):
+            async for chunk in ai_service.stream_completion(messages, system_prompt):
                 if not self.is_generating:
                     break
 
-                full_response += chunk
+                response_chunks.append(chunk)
                 chunk_count += 1
 
                 # Update UI every N chunks for consistent performance
                 if chunk_count >= update_frequency:
+                    full_response = "".join(response_chunks)
                     # Update the last message in conversation
                     if self.current_conversation and self.current_conversation.messages:
                         self.current_conversation.messages[-1].content = full_response
@@ -1074,9 +1091,21 @@ class PopupAIWindow(Adw.ApplicationWindow):
                     chunk_count = 0
 
             # Final update with complete response
+            full_response = "".join(response_chunks)
             if full_response and self.current_conversation:
                 # Get token usage from AI service
-                tokens_input, tokens_output = self.ai_service.get_last_token_usage()
+                tokens_input, tokens_output = ai_service.get_last_token_usage()
+
+                logger.debug(
+                    f"Getting token usage from AI service: input={tokens_input}, output={tokens_output}"
+                )
+                logger.debug(f"AI service type: {type(ai_service).__name__}")
+                logger.debug(
+                    f"AI service last_tokens_input: {getattr(ai_service, 'last_tokens_input', 'N/A')}"
+                )
+                logger.debug(
+                    f"AI service last_tokens_output: {getattr(ai_service, 'last_tokens_output', 'N/A')}"
+                )
 
                 # Update the assistant message with content and token info
                 self.current_conversation.messages[-1].content = full_response

@@ -129,6 +129,7 @@ class DaemonManager:
             sys.exit(1)
         finally:
             self._cleanup_pid_file()
+        return True
 
     def stop(self, timeout: int = 5) -> bool:
         """Stop daemon process.

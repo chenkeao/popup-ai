@@ -33,7 +33,7 @@ class AIService(ABC):
         system_prompt: Optional[str] = None,
     ) -> AsyncIterator[str]:
         """Stream completion from the AI model."""
-        pass
+        yield ""
 
     @abstractmethod
     async def list_models(self) -> List[str]:
@@ -149,15 +149,19 @@ class OllamaService(AIService):
                             # Extract token usage from final response
                             if "prompt_eval_count" in data:
                                 tokens_input = data["prompt_eval_count"]
+                                self.last_tokens_input = tokens_input
                             if "eval_count" in data:
                                 tokens_output = data["eval_count"]
+                                self.last_tokens_output = tokens_output
                             break
                     except json.JSONDecodeError:
                         continue
 
-            # Store token usage
-            self.last_tokens_input = tokens_input
-            self.last_tokens_output = tokens_output
+            # Ensure tokens are stored (in case they weren't set in the loop)
+            if tokens_input is not None:
+                self.last_tokens_input = tokens_input
+            if tokens_output is not None:
+                self.last_tokens_output = tokens_output
 
             # Log successful response
             duration = time.time() - start_time
@@ -296,6 +300,11 @@ class OpenAICompatibleService(AIService):
                             usage = data["usage"]
                             tokens_input = usage.get("prompt_tokens")
                             tokens_output = usage.get("completion_tokens")
+                            # Immediately store token usage when available
+                            if tokens_input is not None:
+                                self.last_tokens_input = tokens_input
+                            if tokens_output is not None:
+                                self.last_tokens_output = tokens_output
 
                         if "choices" in data and len(data["choices"]) > 0:
                             delta = data["choices"][0].get("delta", {})
@@ -313,9 +322,11 @@ class OpenAICompatibleService(AIService):
                     except json.JSONDecodeError:
                         continue
 
-            # Store token usage
-            self.last_tokens_input = tokens_input
-            self.last_tokens_output = tokens_output
+            # Ensure tokens are stored (fallback)
+            if tokens_input is not None:
+                self.last_tokens_input = tokens_input
+            if tokens_output is not None:
+                self.last_tokens_output = tokens_output
 
             # Log successful response
             duration = time.time() - start_time

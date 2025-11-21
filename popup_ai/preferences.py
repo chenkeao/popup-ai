@@ -1,5 +1,6 @@
 """Preferences window for managing settings."""
 
+from typing import Optional
 import gi
 
 gi.require_version("Gtk", "4.0")
@@ -555,7 +556,11 @@ class PromptEditDialog(Adw.Window):
     """Dialog for editing or creating prompts."""
 
     def __init__(
-        self, parent, settings: Settings, prompt: PromptTemplate = None, on_save_callback=None
+        self,
+        parent,
+        settings: Settings,
+        prompt: Optional[PromptTemplate] = None,
+        on_save_callback=None,
     ):
         super().__init__(transient_for=parent, modal=True)
 
@@ -609,7 +614,7 @@ class PromptEditDialog(Adw.Window):
 
         self.name_entry = Gtk.Entry()
         self.name_entry.set_placeholder_text(PLACEHOLDER_PROMPT_NAME)
-        if self.is_edit:
+        if prompt:
             self.name_entry.set_text(prompt.name)
         content_box.append(self.name_entry)
 
@@ -622,7 +627,7 @@ class PromptEditDialog(Adw.Window):
 
         self.desc_entry = Gtk.Entry()
         self.desc_entry.set_placeholder_text(PLACEHOLDER_DESCRIPTION)
-        if self.is_edit and prompt.description:
+        if prompt and prompt.description:
             self.desc_entry.set_text(prompt.description)
         content_box.append(self.desc_entry)
 
@@ -645,7 +650,7 @@ class PromptEditDialog(Adw.Window):
         model_list.append("(None)")
 
         selected_idx = 0
-        if self.is_edit and prompt.default_model:
+        if prompt and prompt.default_model:
             for i, model in enumerate(settings.models):
                 model_list.append(model.name)
                 if model.name == prompt.default_model:
@@ -678,7 +683,7 @@ class PromptEditDialog(Adw.Window):
         self.prompt_text.set_right_margin(MARGIN_MEDIUM)
         self.prompt_text.set_top_margin(MARGIN_MEDIUM)
         self.prompt_text.set_bottom_margin(MARGIN_MEDIUM)
-        if self.is_edit:
+        if prompt:
             self.prompt_text.get_buffer().set_text(prompt.system_prompt)
         prompt_scroll.set_child(self.prompt_text)
 
@@ -694,7 +699,7 @@ class PromptEditDialog(Adw.Window):
             return
 
         # Check if name already exists (and it's not the current prompt being edited)
-        if not self.is_edit or name != self.prompt.name:
+        if self.prompt is None or name != self.prompt.name:
             if self.settings.get_prompt(name):
                 self.show_error(ERROR_NAME_EXISTS.format(name=name))
                 return
@@ -727,7 +732,7 @@ class PromptEditDialog(Adw.Window):
         )
 
         # If editing and name changed, remove old prompt
-        if self.is_edit and name != self.prompt.name:
+        if self.prompt is not None and name != self.prompt.name:
             self.settings.remove_prompt(self.prompt.name)
 
         self.settings.add_prompt(new_prompt)

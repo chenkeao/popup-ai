@@ -261,9 +261,7 @@ def get_logger(name: str) -> logging.Logger:
     Returns:
         Logger instance
     """
-    if _logger_instance is None:
-        setup_logging()
-    return _logger_instance.get_logger(name)
+    return setup_logging().get_logger(name)
 
 
 def get_ai_logger() -> logging.Logger:
@@ -272,27 +270,19 @@ def get_ai_logger() -> logging.Logger:
     Returns:
         AI logger instance
     """
-    if _logger_instance is None:
-        setup_logging()
-    return _logger_instance.get_ai_logger()
+    return setup_logging().get_ai_logger()
 
 
 def log_ai_request(*args, **kwargs):
     """Log an AI request."""
-    if _logger_instance is None:
-        setup_logging()
-    _logger_instance.log_ai_request(*args, **kwargs)
+    setup_logging().log_ai_request(*args, **kwargs)
 
 
 def log_ai_response(*args, **kwargs):
     """Log an AI response."""
-    if _logger_instance is None:
-        setup_logging()
-    _logger_instance.log_ai_response(*args, **kwargs)
+    setup_logging().log_ai_response(*args, **kwargs)
 
 
 def log_ai_stream_chunk(*args, **kwargs):
     """Log streaming chunk."""
-    if _logger_instance is None:
-        setup_logging()
-    _logger_instance.log_ai_stream_chunk(*args, **kwargs)
+    setup_logging().log_ai_stream_chunk(*args, **kwargs)
