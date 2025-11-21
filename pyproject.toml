@@ -6,7 +6,7 @@ build-backend = "mesonpy"
 name = "popup-ai"
 version = "0.1.0"
 description = "A popup AI assistant for Wayland with GTK4 and Libadwaita"
-authors = [{name = "Kyle Chen", email = "kyle@example.com"}]
+authors = [{name = "Kyle Chen", email = "keao.chen@outlook.com"}]
 license = {text = "GPL-3.0-or-later"}
 readme = "README.md"
 requires-python = ">=3.11"

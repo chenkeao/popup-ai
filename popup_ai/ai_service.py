@@ -381,7 +381,7 @@ def create_ai_service(
     """Factory function to create AI service instances."""
     if model_type == "ollama":
         return OllamaService(endpoint=endpoint, model=model)
-    elif model_type == "api":
+    elif model_type == "api" or model_type == "perplexity":
         if not api_key:
             raise ValueError("API key is required for API-based models")
         return OpenAICompatibleService(endpoint=endpoint, api_key=api_key, model=model)
@@ -421,13 +421,24 @@ async def fetch_available_models(
     """Fetch available models from the service.
 
     Args:
-        model_type: Type of service ("ollama" or "api")
+        model_type: Type of service ("ollama", "api", or "perplexity")
         endpoint: API endpoint URL
         api_key: API key for authentication (required for API type)
 
     Returns:
         List of available model IDs (filtered for API type)
     """
+    # Perplexity API does not support listing models via /v1/models endpoint
+    # So we return a hardcoded list of known models
+    if model_type == "perplexity":
+        return [
+            "sonar-reasoning-pro",
+            "sonar-reasoning",
+            "sonar-pro",
+            "sonar",
+            "r1-1776",
+        ]
+
     try:
         # Create temporary service instance
         temp_service = create_ai_service(
@@ -446,7 +457,7 @@ async def fetch_available_models(
         # Give httpx more time to cleanup internal tasks
         await asyncio.sleep(0.1)
 
-        # Filter models for API type (OpenAI-compatible) to only include GPT-4.0, 4.1, 5.0 series
+        # Filter models based on type
         if model_type == "api":
             models = _filter_gpt_models(models)
 

@@ -103,6 +103,30 @@ class PreferencesWindow(Adw.PreferencesWindow):
         self.openai_api_key_row.connect("changed", self.on_config_changed, "openai_api_key")
         openai_group.add(self.openai_api_key_row)
 
+        # Perplexity settings
+        perplexity_group = Adw.PreferencesGroup()
+        perplexity_group.set_title("Perplexity AI")
+        perplexity_group.set_description("Perplexity AI API configuration")
+        api_page.add(perplexity_group)
+
+        # Perplexity endpoint
+        self.perplexity_endpoint_row = Adw.EntryRow()
+        self.perplexity_endpoint_row.set_title("Endpoint")
+        self.perplexity_endpoint_row.set_text(
+            self.settings.get("perplexity_endpoint", "https://api.perplexity.ai")
+        )
+        self.perplexity_endpoint_row.connect(
+            "changed", self.on_config_changed, "perplexity_endpoint"
+        )
+        perplexity_group.add(self.perplexity_endpoint_row)
+
+        # Perplexity API key
+        self.perplexity_api_key_row = Adw.PasswordEntryRow()
+        self.perplexity_api_key_row.set_title("API Key")
+        self.perplexity_api_key_row.set_text(self.settings.get("perplexity_api_key", ""))
+        self.perplexity_api_key_row.connect("changed", self.on_config_changed, "perplexity_api_key")
+        perplexity_group.add(self.perplexity_api_key_row)
+
         # Custom API settings
         custom_group = Adw.PreferencesGroup()
         custom_group.set_title("Custom API")
@@ -313,6 +337,8 @@ class PreferencesWindow(Adw.PreferencesWindow):
             "ollama_endpoint",
             "openai_endpoint",
             "openai_api_key",
+            "perplexity_endpoint",
+            "perplexity_api_key",
             "custom_api_endpoint",
             "custom_api_key",
         ]:

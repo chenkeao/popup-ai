@@ -450,13 +450,27 @@ class PopupAIWindow(Adw.ApplicationWindow):
             model_list.append(model.name)
         self.model_dropdown.set_model(model_list)
 
-        # Always use default model on startup (not selected_model)
-        default_model = self.settings.get("default_model", "")
+        # Determine which model to select
+        target_model = None
+
+        # 1. Check if current prompt has a default model
+        if hasattr(self, "prompt_dropdown"):
+            selected_prompt_idx = self.prompt_dropdown.get_selected()
+            if selected_prompt_idx != Gtk.INVALID_LIST_POSITION and selected_prompt_idx < len(
+                self.settings.prompts
+            ):
+                prompt = self.settings.prompts[selected_prompt_idx]
+                if prompt.default_model:
+                    target_model = prompt.default_model
+
+        # 2. If no prompt default, use global default
+        if not target_model:
+            target_model = self.settings.get("default_model", "")
 
         selected_index = -1
-        if default_model:
+        if target_model:
             for i, model in enumerate(self.settings.models):
-                if model.name == default_model:
+                if model.name == target_model:
                     selected_index = i
                     break
 
@@ -571,10 +585,7 @@ class PopupAIWindow(Adw.ApplicationWindow):
     async def auto_fetch_models(self):
         """Automatically fetch models from configured endpoints."""
         fetched_any = False
-
-        # Clear existing models before fetching new ones
-        # This ensures old/filtered models are removed
-        self.settings.models = []
+        new_models = []
 
         # Fetch from Ollama
         ollama_endpoint = self.settings.get("ollama_endpoint", "http://localhost:11434")
@@ -588,7 +599,7 @@ class PopupAIWindow(Adw.ApplicationWindow):
                         endpoint=ollama_endpoint,
                         model_id=model_id,
                     )
-                    self.settings.add_model(model_config)
+                    new_models.append(model_config)
                     fetched_any = True
             except Exception as e:
                 logger.error(f"Failed to fetch Ollama models: {e}")
@@ -607,10 +618,31 @@ class PopupAIWindow(Adw.ApplicationWindow):
                         api_key=openai_api_key,
                         model_id=model_id,
                     )
-                    self.settings.add_model(model_config)
+                    new_models.append(model_config)
                     fetched_any = True
             except Exception as e:
                 logger.error(f"Failed to fetch OpenAI models: {e}")
+
+        # Fetch from Perplexity if API key is configured
+        perplexity_endpoint = self.settings.get("perplexity_endpoint", "")
+        perplexity_api_key = self.settings.get("perplexity_api_key", "")
+        if perplexity_endpoint and perplexity_api_key:
+            try:
+                model_ids = await fetch_available_models(
+                    "perplexity", perplexity_endpoint, perplexity_api_key
+                )
+                for model_id in model_ids:
+                    model_config = ModelConfig(
+                        name=f"{model_id}",
+                        type="perplexity",
+                        endpoint=perplexity_endpoint,
+                        api_key=perplexity_api_key,
+                        model_id=model_id,
+                    )
+                    new_models.append(model_config)
+                    fetched_any = True
+            except Exception as e:
+                logger.error(f"Failed to fetch Perplexity models: {e}")
 
         # Fetch from custom API if configured
         custom_endpoint = self.settings.get("custom_api_endpoint", "")
@@ -626,15 +658,20 @@ class PopupAIWindow(Adw.ApplicationWindow):
                         api_key=custom_api_key if custom_api_key else None,
                         model_id=model_id,
                     )
-                    self.settings.add_model(model_config)
+                    new_models.append(model_config)
                     fetched_any = True
             except Exception as e:
                 logger.error(f"Failed to fetch custom API models: {e}")
 
         # Update UI on main thread
         if fetched_any:
-            GLib.idle_add(self.update_model_list)
-            # update_model_list will call initialize_ai_service
+            GLib.idle_add(self._update_models_on_main_thread, new_models)
+
+    def _update_models_on_main_thread(self, new_models):
+        """Update models on main thread."""
+        self.settings.models = new_models
+        self.settings.save_models(new_models)
+        self.update_model_list()
 
     def load_conversation_history(self):
         """Load conversation history into si    debar."""

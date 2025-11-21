@@ -22,6 +22,7 @@ DEFAULT_WEBVIEW_FONT_SIZE = 14
 # API Endpoints
 DEFAULT_OLLAMA_ENDPOINT = "http://localhost:11434"
 DEFAULT_OPENAI_ENDPOINT = "https://api.openai.com"
+DEFAULT_PERPLEXITY_ENDPOINT = "https://api.perplexity.ai"
 
 # Network Settings
 HTTP_TIMEOUT = 120.0
