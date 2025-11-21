@@ -56,6 +56,8 @@ class ConversationMessage(BaseModel):
     role: str  # "user" or "assistant"
     content: str
     timestamp: float
+    tokens_input: Optional[int] = None  # Tokens used for input (prompt)
+    tokens_output: Optional[int] = None  # Tokens used for output (completion)
 
 
 class Conversation(BaseModel):

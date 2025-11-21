@@ -134,6 +134,12 @@ def get_conversation_styles(font_family: str, font_size: int, css_vars: dict) ->
             justify-content: space-between;
             align-items: center;
         }}
+        .token-info {{
+            font-weight: 400;
+            font-size: 0.9em;
+            opacity: 0.7;
+            margin-left: 8px;
+        }}
         .copy-btn {{
             background: none;
             border: none;

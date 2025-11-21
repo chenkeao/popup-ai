@@ -149,6 +149,8 @@ class PopupAILogger:
         success: bool = True,
         error: Optional[str] = None,
         metadata: Optional[dict] = None,
+        tokens_input: Optional[int] = None,
+        tokens_output: Optional[int] = None,
     ):
         """Log an AI response.
 
@@ -159,6 +161,8 @@ class PopupAILogger:
             success: Whether the request was successful
             error: Error message if any
             metadata: Additional metadata
+            tokens_input: Input tokens used
+            tokens_output: Output tokens generated
         """
         log_entry = {
             "type": "response",
@@ -171,6 +175,13 @@ class PopupAILogger:
                 response[:200] + "..." if response and len(response) > 200 else response
             ),
         }
+
+        if tokens_input is not None:
+            log_entry["tokens_input"] = tokens_input
+        if tokens_output is not None:
+            log_entry["tokens_output"] = tokens_output
+        if tokens_input is not None and tokens_output is not None:
+            log_entry["tokens_total"] = tokens_input + tokens_output
 
         if error:
             log_entry["error"] = error

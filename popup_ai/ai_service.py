@@ -22,6 +22,10 @@ logger = get_logger(__name__)
 class AIService(ABC):
     """Abstract base class for AI services."""
 
+    def __init__(self):
+        self.last_tokens_input: Optional[int] = None
+        self.last_tokens_output: Optional[int] = None
+
     @abstractmethod
     async def stream_completion(
         self,
@@ -44,11 +48,20 @@ class AIService(ABC):
         """Close the service and cleanup resources."""
         pass
 
+    def get_last_token_usage(self) -> tuple[Optional[int], Optional[int]]:
+        """Get token usage from last request.
+
+        Returns:
+            Tuple of (input_tokens, output_tokens)
+        """
+        return (self.last_tokens_input, self.last_tokens_output)
+
 
 class OllamaService(AIService):
     """Ollama AI service implementation."""
 
     def __init__(self, endpoint: str, model: str):
+        super().__init__()
         self.endpoint = endpoint.rstrip("/")
         self.model = model
         self.client = httpx.AsyncClient(
@@ -94,6 +107,8 @@ class OllamaService(AIService):
         full_response = ""
         chunk_count = 0
         error_msg = None
+        tokens_input = None
+        tokens_output = None
 
         try:
             async with self.client.stream(
@@ -131,9 +146,18 @@ class OllamaService(AIService):
                                 yield content
 
                         if data.get("done", False):
+                            # Extract token usage from final response
+                            if "prompt_eval_count" in data:
+                                tokens_input = data["prompt_eval_count"]
+                            if "eval_count" in data:
+                                tokens_output = data["eval_count"]
                             break
                     except json.JSONDecodeError:
                         continue
+
+            # Store token usage
+            self.last_tokens_input = tokens_input
+            self.last_tokens_output = tokens_output
 
             # Log successful response
             duration = time.time() - start_time
@@ -143,6 +167,8 @@ class OllamaService(AIService):
                 duration=duration,
                 success=True,
                 metadata={"service": "ollama", "chunks": chunk_count},
+                tokens_input=tokens_input,
+                tokens_output=tokens_output,
             )
 
         except Exception as e:
@@ -181,6 +207,7 @@ class OpenAICompatibleService(AIService):
     """OpenAI-compatible API service implementation."""
 
     def __init__(self, endpoint: str, model: str, api_key: Optional[str] = None):
+        super().__init__()
         self.endpoint = endpoint.rstrip("/")
         self.model = model
         self.api_key = api_key
@@ -234,6 +261,8 @@ class OpenAICompatibleService(AIService):
         full_response = ""
         chunk_count = 0
         error_msg = None
+        tokens_input = None
+        tokens_output = None
 
         try:
             async with self.client.stream(
@@ -243,6 +272,7 @@ class OpenAICompatibleService(AIService):
                     "model": self.model,
                     "messages": formatted_messages,
                     "stream": True,
+                    "stream_options": {"include_usage": True},  # Request usage info
                 },
             ) as response:
                 response.raise_for_status()
@@ -260,6 +290,13 @@ class OpenAICompatibleService(AIService):
 
                     try:
                         data = json.loads(line[6:])  # Remove "data: " prefix
+
+                        # Extract usage info if available
+                        if "usage" in data and data["usage"] is not None:
+                            usage = data["usage"]
+                            tokens_input = usage.get("prompt_tokens")
+                            tokens_output = usage.get("completion_tokens")
+
                         if "choices" in data and len(data["choices"]) > 0:
                             delta = data["choices"][0].get("delta", {})
                             content = delta.get("content")
@@ -276,6 +313,10 @@ class OpenAICompatibleService(AIService):
                     except json.JSONDecodeError:
                         continue
 
+            # Store token usage
+            self.last_tokens_input = tokens_input
+            self.last_tokens_output = tokens_output
+
             # Log successful response
             duration = time.time() - start_time
             log_ai_response(
@@ -284,6 +325,8 @@ class OpenAICompatibleService(AIService):
                 duration=duration,
                 success=True,
                 metadata={"service": "openai_compatible", "chunks": chunk_count},
+                tokens_input=tokens_input,
+                tokens_output=tokens_output,
             )
 
         except Exception as e:

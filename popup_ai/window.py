@@ -895,10 +895,25 @@ class PopupAIWindow(Adw.ApplicationWindow):
 
                 role_display = CONV_ROLE_USER if msg.role == "user" else CONV_ROLE_ASSISTANT
 
+                # Build token info display
+                token_info_html = ""
+                if msg.tokens_input is not None or msg.tokens_output is not None:
+                    token_parts = []
+                    if msg.tokens_input is not None:
+                        token_parts.append(f"输入: {msg.tokens_input:,}")
+                    if msg.tokens_output is not None:
+                        token_parts.append(f"输出: {msg.tokens_output:,}")
+                    if msg.tokens_input is not None and msg.tokens_output is not None:
+                        total = msg.tokens_input + msg.tokens_output
+                        token_parts.append(f"总计: {total:,}")
+                    token_info_html = (
+                        f'<span class="token-info">🎫 {" | ".join(token_parts)}</span>'
+                    )
+
                 messages_html += f"""
                 <div class="message {role_class}">
                     <div class="message-header">
-                        <span>{role_display}</span>
+                        <span>{role_display} {token_info_html}</span>
                         <button class="copy-btn" onclick="copyMessage('{idx}')" title="{TOOLTIP_COPY_SOURCE}">
                             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                                 <path d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V2Z"/>
@@ -1060,10 +1075,27 @@ class PopupAIWindow(Adw.ApplicationWindow):
 
             # Final update with complete response
             if full_response and self.current_conversation:
+                # Get token usage from AI service
+                tokens_input, tokens_output = self.ai_service.get_last_token_usage()
+
+                # Update the assistant message with content and token info
                 self.current_conversation.messages[-1].content = full_response
+                self.current_conversation.messages[-1].tokens_input = tokens_input
+                self.current_conversation.messages[-1].tokens_output = tokens_output
+
+                # Also update the user message with input tokens (it was part of the prompt)
+                if len(self.current_conversation.messages) >= 2:
+                    # The user message is second to last
+                    self.current_conversation.messages[-2].tokens_input = tokens_input
+
                 self.current_conversation.updated_at = time.time()
-                # Only update via JavaScript for final render, no need to reload HTML
-                GLib.idle_add(self._update_streaming_content, full_response)
+
+                logger.info(
+                    f"Response completed. Tokens: input={tokens_input}, output={tokens_output}"
+                )
+
+                # Force reload to show token info
+                GLib.idle_add(self._update_webview, True)
 
                 # Save conversation
                 self.settings.save_conversation(self.current_conversation)
