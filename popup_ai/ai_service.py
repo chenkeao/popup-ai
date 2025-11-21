@@ -210,11 +210,18 @@ class OllamaService(AIService):
 class OpenAICompatibleService(AIService):
     """OpenAI-compatible API service implementation."""
 
-    def __init__(self, endpoint: str, model: str, api_key: Optional[str] = None):
+    def __init__(
+        self,
+        endpoint: str,
+        model: str,
+        api_key: Optional[str] = None,
+        model_type: str = "api",
+    ):
         super().__init__()
         self.endpoint = endpoint.rstrip("/")
         self.model = model
         self.api_key = api_key
+        self.model_type = model_type
 
         # Setup headers
         headers = {"Content-Type": "application/json"}
@@ -268,10 +275,15 @@ class OpenAICompatibleService(AIService):
         tokens_input = None
         tokens_output = None
 
+        # Determine URL based on model type
+        url = f"{self.endpoint}/v1/chat/completions"
+        if self.model_type == "perplexity":
+            url = f"{self.endpoint}/chat/completions"
+
         try:
             async with self.client.stream(
                 "POST",
-                f"{self.endpoint}/v1/chat/completions",
+                url,
                 json={
                     "model": self.model,
                     "messages": formatted_messages,
@@ -384,7 +396,9 @@ def create_ai_service(
     elif model_type == "api" or model_type == "perplexity":
         if not api_key:
             raise ValueError("API key is required for API-based models")
-        return OpenAICompatibleService(endpoint=endpoint, api_key=api_key, model=model)
+        return OpenAICompatibleService(
+            endpoint=endpoint, api_key=api_key, model=model, model_type=model_type
+        )
     else:
         raise ValueError(f"Unknown model type: {model_type}")
 
