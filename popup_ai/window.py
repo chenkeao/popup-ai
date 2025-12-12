@@ -173,6 +173,11 @@ class PopupAIWindow(Adw.ApplicationWindow):
         style_manager = Adw.StyleManager.get_default()
         style_manager.connect("notify::dark", self.on_theme_changed)
 
+        # Add key controller for window-level shortcuts
+        key_controller = Gtk.EventControllerKey()
+        key_controller.connect("key-pressed", self.on_window_key_pressed)
+        self.add_controller(key_controller)
+
     def _load_css(self):
         """Load custom CSS styles."""
         try:
@@ -1198,6 +1203,13 @@ class PopupAIWindow(Adw.ApplicationWindow):
 
         # Start new conversation
         self.start_new_conversation()
+
+    def on_window_key_pressed(self, controller, keyval, keycode, state):
+        """Handle window-level key press events."""
+        if keyval == Gdk.KEY_Escape:
+            self.close()
+            return True
+        return False
 
     def on_key_pressed(self, controller, keyval, keycode, state):
         """Handle key press in input area."""
