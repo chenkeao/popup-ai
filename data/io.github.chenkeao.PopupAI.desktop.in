@@ -11,4 +11,3 @@ StartupNotify=true
 StartupWMClass=@application_id@
 DBusActivatable=false
 X-GNOME-UsesNotifications=true
-NoDisplay=true

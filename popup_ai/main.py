@@ -4,110 +4,157 @@ import sys
 import gi
 
 gi.require_version("Gio", "2.0")
-
 from gi.repository import Gio, GLib
-from popup_ai.daemon import DaemonManager
+from popup_ai.application import PopupAIApplication
 
 
-def run_daemon():
-    """Run the application as a daemon service."""
-    import os
+def is_app_running():
+    """Check if app is already running via D-Bus."""
+    try:
+        connection = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+        proxy = Gio.DBusProxy.new_sync(
+            connection,
+            Gio.DBusProxyFlags.NONE,
+            None,
+            "org.freedesktop.DBus",
+            "/org/freedesktop/DBus",
+            "org.freedesktop.DBus",
+            None,
+        )
+        names = proxy.call_sync(
+            "ListNames",
+            None,
+            Gio.DBusCallFlags.NONE,
+            -1,
+            None,
+        )
+        return "io.github.chenkeao.PopupAI" in names[0]
+    except Exception:
+        return False
 
-    from popup_ai.application import PopupAIApplication
 
-    app = PopupAIApplication(service_mode=True)
-    return app.run([])
+def send_show_window(text):
+    """Send ShowWindow message to running instance."""
+    try:
+        connection = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+        message = Gio.DBusMessage.new_method_call(
+            "io.github.chenkeao.PopupAI",
+            "/io/github/chenkeao/PopupAI",
+            "io.github.chenkeao.PopupAI",
+            "ShowWindow",
+        )
+        message.set_body(GLib.Variant("(s)", (text,)))
+        connection.send_message(message, Gio.DBusSendMessageFlags.NONE)
+        connection.flush_sync(None)
+        return True
+    except Exception as e:
+        print(f"Failed to send message: {e}", file=sys.stderr)
+        return False
 
 
 def main():
     """Main entry point."""
-    daemon = DaemonManager(app_id="popup-ai")
+    args = sys.argv[1:]
 
     # Handle daemon control commands
-    if len(sys.argv) > 1 and sys.argv[1] in ["--daemon", "--start-daemon", "start"]:
-        if daemon.is_running():
-            print("Daemon is already running", file=sys.stderr)
-            return 0
+    if len(args) > 0:
+        if args[0] == "--status":
+            if is_app_running():
+                print("Application is running")
+                return 0
+            else:
+                print("Application is not running")
+                return 1
+        elif args[0] == "--start":
+            if is_app_running():
+                print("Application is already running")
+                return 0
+            # Fall through to start the app
+        elif args[0] == "--stop":
+            if not is_app_running():
+                print("Application is not running")
+                return 0
+            try:
+                connection = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+                # Call the quit action via org.gtk.Actions
+                message = Gio.DBusMessage.new_method_call(
+                    "io.github.chenkeao.PopupAI",
+                    "/io/github/chenkeao/PopupAI",
+                    "org.gtk.Actions",
+                    "Activate",
+                )
+                # Parameters: action_name, parameter array, platform_data
+                message.set_body(GLib.Variant("(sava{sv})", ("quit", [], {})))
+                connection.send_message(message, Gio.DBusSendMessageFlags.NONE)
+                connection.flush_sync(None)
 
-        print("Starting daemon...", file=sys.stderr)
-        if daemon.start(run_daemon):
-            print("Daemon started successfully", file=sys.stderr)
-            return 0
-        else:
-            print("Failed to start daemon", file=sys.stderr)
-            return 1
+                # Wait for app to actually quit
+                import time
 
-    elif len(sys.argv) > 1 and sys.argv[1] in ["--stop-daemon", "stop"]:
-        if not daemon.is_running():
-            print("Daemon is not running", file=sys.stderr)
-            return 0
+                for _ in range(20):  # Wait up to 2 seconds
+                    time.sleep(0.1)
+                    if not is_app_running():
+                        break
 
-        print("Stopping daemon...", file=sys.stderr)
-        if daemon.stop():
-            print("Daemon stopped successfully", file=sys.stderr)
-            return 0
-        else:
-            print("Failed to stop daemon", file=sys.stderr)
-            return 1
+                print("Application stopped")
+                return 0
+            except Exception as e:
+                print(f"Failed to stop application: {e}")
+                return 1
+        elif args[0] == "--restart":
+            # Stop if running
+            if is_app_running():
+                try:
+                    connection = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+                    # Call the quit action via org.gtk.Actions
+                    message = Gio.DBusMessage.new_method_call(
+                        "io.github.chenkeao.PopupAI",
+                        "/io/github/chenkeao/PopupAI",
+                        "org.gtk.Actions",
+                        "Activate",
+                    )
+                    message.set_body(GLib.Variant("(sava{sv})", ("quit", [], {})))
+                    connection.send_message(message, Gio.DBusSendMessageFlags.NONE)
+                    connection.flush_sync(None)
+                    import time
 
-    elif len(sys.argv) > 1 and sys.argv[1] in ["--restart-daemon", "restart"]:
-        print("Restarting daemon...", file=sys.stderr)
-        if daemon.restart(run_daemon):
-            print("Daemon restarted successfully", file=sys.stderr)
-            return 0
-        else:
-            print("Failed to restart daemon", file=sys.stderr)
-            return 1
+                    time.sleep(0.5)
+                except Exception:
+                    pass
+            # Fall through to start the app
 
-    elif len(sys.argv) > 1 and sys.argv[1] in ["--status", "status"]:
-        if daemon.is_running():
-            pid = daemon.get_pid()
-            print(f"Daemon is running (PID: {pid})", file=sys.stderr)
-            return 0
-        else:
-            print("Daemon is not running", file=sys.stderr)
-            return 1
+    # Extract text arguments (non-option args)
+    text_args = [arg for arg in args if not arg.startswith("--")]
+    initial_text = " ".join(text_args) if text_args else ""
 
-    # Check if running as service (for backward compatibility)
-    if "--service" in sys.argv:
-        return run_daemon()
-
-    # Client mode: send D-Bus notification to daemon
-    app_id = "io.github.chenkeao.PopupAI"
-
-    # Ensure daemon is running
-    if not daemon.is_running():
-        # Start daemon in background, don't wait
-        daemon.start(run_daemon)
-        # Exit immediately after starting daemon
-        # The daemon will handle the window creation
+    # If app is already running, send message and exit immediately
+    if is_app_running():
+        if initial_text or not args:  # Send message if there's text or no args (just activate)
+            send_show_window(initial_text)
         return 0
 
-    try:
-        # Connect to session bus
-        connection = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+    # App is not running - start it in background using subprocess
+    import subprocess
 
-        # Get command line arguments (skip program name and daemon control commands)
-        args = [arg for arg in sys.argv[1:] if not arg.startswith("--")]
-        initial_text = " ".join(args) if args else ""
-
-        # Send D-Bus message asynchronously (fire and forget)
-        message = Gio.DBusMessage.new_method_call(
-            app_id, "/io/github/chenkeao/PopupAI", "io.github.chenkeao.PopupAI", "ShowWindow"
-        )
-        message.set_body(GLib.Variant("(s)", (initial_text,)))
-
-        # Send the message without waiting for reply
-        connection.send_message(message, Gio.DBusSendMessageFlags.NONE)
-
-        # Flush to ensure message is sent immediately
-        connection.flush_sync(None)
-
-        return 0
-    except Exception:
-        # If D-Bus connection fails, daemon might not be ready
-        return 0
+    # Start a new detached process
+    subprocess.Popen(
+        [sys.executable, "-m", "popup_ai.main", "--background-start"]
+        + ([initial_text] if initial_text else []),
+        start_new_session=True,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    # Special internal flag to actually run the app (used by subprocess)
+    if len(sys.argv) > 1 and sys.argv[1] == "--background-start":
+        # Remove the flag and get the initial text
+        text_args = [arg for arg in sys.argv[2:] if not arg.startswith("--")]
+        initial_text = " ".join(text_args) if text_args else ""
+        app = PopupAIApplication(initial_text=initial_text)
+        sys.exit(app.run(None))
+    else:
+        sys.exit(main())

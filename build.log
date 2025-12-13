@@ -1,0 +1,6 @@
+Downloading sources
+Downloading https://files.pythonhosted.org/packages/cf/4e/35a80cae583a37cf15604b44240e45c05e04e86f9cfd766623149297e971/pydantic_core-2.41.5-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 2024k  100 2024k    0     0  9113k      0 --:--:-- --:--:-- --:--:-- 9160k
+Failed to download sources: module python3-pydantic: Wrong sha256 checksum for pydantic_core-2.41.5-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl, expected "d85203ee0d8e071b32b66d0985eea9fa0b0bcfd506c056e0bf6ae1c67c4081c0", was "406bf18d345822d6c21366031003612b9c77b3e29ffdb0f612367352aab7d586"

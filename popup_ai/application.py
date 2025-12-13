@@ -39,28 +39,23 @@ logger = get_logger(__name__)
 class PopupAIApplication(Adw.Application):
     """Main application class."""
 
-    def __init__(self, initial_text=None, service_mode=False):
+    def __init__(self, initial_text=None):
+        # Use DEFAULT_FLAGS which enables single-instance by default
         super().__init__(
             application_id=APP_ID,
-            flags=(
-                Gio.ApplicationFlags.FLAGS_NONE
-                if service_mode
-                else Gio.ApplicationFlags.HANDLES_COMMAND_LINE
-            ),
+            flags=Gio.ApplicationFlags.DEFAULT_FLAGS,
         )
         # Setup logging first
         setup_logging()
-        logger.info(f"Initializing {APP_NAME} v{APP_VERSION} (service_mode={service_mode})")
+        logger.info(f"Initializing {APP_NAME} v{APP_VERSION}")
 
         self.initial_text = initial_text
         self.window = None
         self.settings = Settings()
-        self.service_mode = service_mode
         self._dbus_id = None
 
-        # In service mode, hold the application to prevent auto-exit
-        if self.service_mode:
-            self.hold()
+        # Connect to activate signal
+        self.connect("activate", self.on_activate)
 
     def show_window(self, initial_text=""):
         """Show the window, restoring or creating as needed."""
@@ -94,9 +89,7 @@ class PopupAIApplication(Adw.Application):
                     pass
                 self.window = None
 
-        self.window = PopupAIWindow(
-            application=self, settings=self.settings, service_mode=self.service_mode
-        )
+        self.window = PopupAIWindow(application=self, settings=self.settings)
         self.window.connect("destroy", self._on_window_destroyed)
 
         self.window.set_visible(True)
@@ -112,12 +105,18 @@ class PopupAIApplication(Adw.Application):
         """Handle window destruction."""
         self.window = None
 
+    def on_activate(self, app):
+        """Called when the application is activated."""
+        # Show window with initial text
+        self.show_window(self.initial_text or "")
+
     def _on_dbus_method_call(
         self, connection, sender, object_path, interface_name, method_name, parameters, invocation
     ):
         """Handle D-Bus method calls."""
         if method_name == "ShowWindow":
             initial_text = parameters[0]
+            # Update the window with new text
             GLib.idle_add(self.show_window, initial_text)
             invocation.return_value(None)
         else:
@@ -127,30 +126,17 @@ class PopupAIApplication(Adw.Application):
                 f"Unknown method: {method_name}",
             )
 
-    def do_activate(self):
-        """Called when the application is activated."""
-        if not self.service_mode:
-            self.show_window(self.initial_text or "")
-
-    def do_command_line(self, command_line):
-        """Handle command line arguments."""
-        args = command_line.get_arguments()[1:]
-        text_args = [arg for arg in args if not arg.startswith("--")]
-        if text_args:
-            self.initial_text = " ".join(text_args)
-        self.activate()
-        return 0
-
     def do_startup(self):
         """Called when the application starts."""
         Adw.Application.do_startup(self)
         Gtk.Window.set_default_icon_name(APP_ID)
         self.setup_actions()
-        if self.service_mode:
-            self._register_dbus_interface()
+
+        # Register custom D-Bus interface
+        self._register_dbus_interface()
 
     def _register_dbus_interface(self):
-        """Register custom D-Bus interface for the service."""
+        """Register custom D-Bus interface for receiving ShowWindow calls."""
         try:
             node_info = Gio.DBusNodeInfo.new_for_xml(DBUS_INTERFACE)
             interface_info = node_info.interfaces[0]
@@ -163,8 +149,8 @@ class PopupAIApplication(Adw.Application):
                     None,
                     None,
                 )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error(f"Failed to register D-Bus interface: {e}")
 
     def setup_actions(self):
         """Setup application actions."""

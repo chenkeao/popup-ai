@@ -1,245 +1,43 @@
 {
-  "app-id": "io.github.chenkeao.PopupAI",
-  "runtime": "org.gnome.Platform",
-  "runtime-version": "47",
-  "sdk": "org.gnome.Sdk",
-  "command": "popup-ai",
-  "finish-args": [
-    "--share=ipc",
-    "--socket=wayland",
-    "--socket=fallback-x11",
-    "--device=dri",
-    "--share=network",
-    "--talk-name=org.freedesktop.secrets",
-    "--own-name=io.github.chenkeao.PopupAI",
-    "--filesystem=xdg-config/popup-ai:create",
-    "--filesystem=xdg-data/popup-ai:create",
-    "--filesystem=xdg-run/popup-ai:create"
-  ],
-  "cleanup": [
-    "/include",
-    "/lib/pkgconfig",
-    "/man",
-    "/share/doc",
-    "/share/gtk-doc",
-    "/share/man",
-    "/share/pkgconfig",
-    "*.la",
-    "*.a"
-  ],
-  "modules": [
-    {
-      "name": "python-dependencies",
-      "buildsystem": "simple",
-      "build-commands": [],
-      "modules": [
+    "app-id": "io.github.chenkeao.PopupAI",
+    "runtime": "org.gnome.Platform",
+    "runtime-version": "49",
+    "sdk": "org.gnome.Sdk",
+    "command": "popup-ai",
+    "finish-args": [
+        "--share=ipc",
+        "--socket=wayland",
+        "--socket=fallback-x11",
+        "--device=dri",
+        "--share=network",
+        "--talk-name=org.freedesktop.secrets",
+        "--own-name=io.github.chenkeao.PopupAI",
+        "--filesystem=xdg-config/popup-ai:create",
+        "--filesystem=xdg-data/popup-ai:create",
+        "--filesystem=xdg-run/popup-ai:create"
+    ],
+    "cleanup": [
+        "/include",
+        "/lib/pkgconfig",
+        "/man",
+        "/share/doc",
+        "/share/gtk-doc",
+        "/share/man",
+        "/share/pkgconfig",
+        "*.la",
+        "*.a"
+    ],
+    "modules": [
+        "python3-requirements.json",
         {
-          "name": "python3-certifi",
-          "buildsystem": "simple",
-          "build-commands": [
-            "pip3 install --verbose --exists-action=i --no-index --find-links=\"file://${PWD}\" --prefix=${FLATPAK_DEST} \"certifi\" --no-build-isolation"
-          ],
-          "sources": [
-            {
-              "type": "file",
-              "url": "https://files.pythonhosted.org/packages/0c/0c/66d2770f46d5b21a8d950f8f6f7c1a3e0fb889f8c04d7b5932e6d0451ad/certifi-2025.1.7-py3-none-any.whl",
-              "sha256": "efd0dced5da3a7efa62e54c1e4e8fe2f0eae1851085c8f4e0da4e67e9b3d16d1"
-            }
-          ]
-        },
-        {
-          "name": "python3-idna",
-          "buildsystem": "simple",
-          "build-commands": [
-            "pip3 install --verbose --exists-action=i --no-index --find-links=\"file://${PWD}\" --prefix=${FLATPAK_DEST} \"idna\" --no-build-isolation"
-          ],
-          "sources": [
-            {
-              "type": "file",
-              "url": "https://files.pythonhosted.org/packages/fd/84/fd2ba7aafacbad3c4201d395674fc6348826569da3c0937e75505ead3528/idna-3.10-py3-none-any.whl",
-              "sha256": "946d195a0d259cbba61165e88e65941f16e9b36ea6ddb97f00452bae8b1287d3"
-            }
-          ]
-        },
-        {
-          "name": "python3-sniffio",
-          "buildsystem": "simple",
-          "build-commands": [
-            "pip3 install --verbose --exists-action=i --no-index --find-links=\"file://${PWD}\" --prefix=${FLATPAK_DEST} \"sniffio\" --no-build-isolation"
-          ],
-          "sources": [
-            {
-              "type": "file",
-              "url": "https://files.pythonhosted.org/packages/e9/44/75a9c9421471a6c4805dbf2356f7c181a29c1879239abab1ea2cc8f38b40/sniffio-1.3.1-py3-none-any.whl",
-              "sha256": "2f6da418d1f1e0fddd844478f41680e794e6051915791a034ff65e5f100525a2"
-            }
-          ]
-        },
-        {
-          "name": "python3-anyio",
-          "buildsystem": "simple",
-          "build-commands": [
-            "pip3 install --verbose --exists-action=i --no-index --find-links=\"file://${PWD}\" --prefix=${FLATPAK_DEST} \"anyio\" --no-build-isolation"
-          ],
-          "sources": [
-            {
-              "type": "file",
-              "url": "https://files.pythonhosted.org/packages/14/fd/2f20c40b45e4fb4324834aea24bd4afdf1143390242c0b33774da0e2e34f/anyio-4.8.0-py3-none-any.whl",
-              "sha256": "c3cdd5c76e8a20f5df3a1f8cc8c6e1cb9b6eaba842e063c3c47af5b967f75a1b"
-            }
-          ]
-        },
-        {
-          "name": "python3-h11",
-          "buildsystem": "simple",
-          "build-commands": [
-            "pip3 install --verbose --exists-action=i --no-index --find-links=\"file://${PWD}\" --prefix=${FLATPAK_DEST} \"h11\" --no-build-isolation"
-          ],
-          "sources": [
-            {
-              "type": "file",
-              "url": "https://files.pythonhosted.org/packages/95/04/ff642e65ad6b90db43e668d70ffb6736436c7ce41fcc549f4e9472234127/h11-0.14.0-py3-none-any.whl",
-              "sha256": "e3fe4ac4b851c468cc8363d500db52c2ead036020723024a109d37346efaa761"
-            }
-          ]
-        },
-        {
-          "name": "python3-httpcore",
-          "buildsystem": "simple",
-          "build-commands": [
-            "pip3 install --verbose --exists-action=i --no-index --find-links=\"file://${PWD}\" --prefix=${FLATPAK_DEST} \"httpcore\" --no-build-isolation"
-          ],
-          "sources": [
-            {
-              "type": "file",
-              "url": "https://files.pythonhosted.org/packages/6f/db/3c11441c4daa94cd5a9e6e3c6d44615fc82c485b2a5aeb9b0e47bb1dfbc7/httpcore-1.0.7-py3-none-any.whl",
-              "sha256": "a3fff8f43dc260d5bd363d9f9cf1830fa3a458b332856f34282de498ed420edd"
-            }
-          ]
-        },
-        {
-          "name": "python3-httpx",
-          "buildsystem": "simple",
-          "build-commands": [
-            "pip3 install --verbose --exists-action=i --no-index --find-links=\"file://${PWD}\" --prefix=${FLATPAK_DEST} \"httpx\" --no-build-isolation"
-          ],
-          "sources": [
-            {
-              "type": "file",
-              "url": "https://files.pythonhosted.org/packages/56/95/9377bcb415797e44274b51d46e3249eba641711cf3348050f76ee7b15ffc/httpx-0.28.1-py3-none-any.whl",
-              "sha256": "d909fcccc110f8c7faf814ca82a9a4d816bc5a6dbfea25d6591d6985b8ba59ad"
-            }
-          ]
-        },
-        {
-          "name": "python3-annotated-types",
-          "buildsystem": "simple",
-          "build-commands": [
-            "pip3 install --verbose --exists-action=i --no-index --find-links=\"file://${PWD}\" --prefix=${FLATPAK_DEST} \"annotated-types\" --no-build-isolation"
-          ],
-          "sources": [
-            {
-              "type": "file",
-              "url": "https://files.pythonhosted.org/packages/ee/67/531ea4f02094fe9c4fb4e7e047627ba3d8d7b8b8b02e32f42f0e0e440a4f/annotated_types-0.7.0-py3-none-any.whl",
-              "sha256": "1f02e8b43a8fbbc3f3e0d4f0f4bfc8131bcb4eebe8849b8e5c773f3a1c582a53"
-            }
-          ]
-        },
-        {
-          "name": "python3-pydantic-core",
-          "buildsystem": "simple",
-          "build-commands": [
-            "pip3 install --verbose --exists-action=i --no-index --find-links=\"file://${PWD}\" --prefix=${FLATPAK_DEST} \"pydantic-core\" --no-build-isolation"
-          ],
-          "sources": [
-            {
-              "type": "file",
-              "url": "https://files.pythonhosted.org/packages/6c/b8/e29c4c47829c8bf76d3d00c8f5c0c0424c7e70ce5a54857da96aa5dc1c73/pydantic_core-2.27.2-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
-              "sha256": "d8fa3d59b8ed83d0e0c9d3c89c377e5f6357370c85e6677c800e8ff9662c27a6"
-            }
-          ]
-        },
-        {
-          "name": "python3-typing-extensions",
-          "buildsystem": "simple",
-          "build-commands": [
-            "pip3 install --verbose --exists-action=i --no-index --find-links=\"file://${PWD}\" --prefix=${FLATPAK_DEST} \"typing-extensions\" --no-build-isolation"
-          ],
-          "sources": [
-            {
-              "type": "file",
-              "url": "https://files.pythonhosted.org/packages/26/9f/ad63fc0248c5379346306f8668cda6e2e2e9c95e01216d2b8ffd9ff037d0/typing_extensions-4.12.2-py3-none-any.whl",
-              "sha256": "04e5ca0351e0f3f85c6853954072df659d0d13fac324d0072316b67d7794700d"
-            }
-          ]
-        },
-        {
-          "name": "python3-pydantic",
-          "buildsystem": "simple",
-          "build-commands": [
-            "pip3 install --verbose --exists-action=i --no-index --find-links=\"file://${PWD}\" --prefix=${FLATPAK_DEST} \"pydantic\" --no-build-isolation"
-          ],
-          "sources": [
-            {
-              "type": "file",
-              "url": "https://files.pythonhosted.org/packages/c8/49/af0be6630c6bb387d2f1d34f7c1f6ffc270bd8c63cef98718a25a6b52f0e/pydantic-2.12.5-py3-none-any.whl",
-              "sha256": "dd3f1f8e3e340ad5f8e2f0cc8c9c231f920bdbf3e2e0925f7f5e06f6a97b1c0e"
-            }
-          ]
-        },
-        {
-          "name": "python3-python-dotenv",
-          "buildsystem": "simple",
-          "build-commands": [
-            "pip3 install --verbose --exists-action=i --no-index --find-links=\"file://${PWD}\" --prefix=${FLATPAK_DEST} \"python-dotenv\" --no-build-isolation"
-          ],
-          "sources": [
-            {
-              "type": "file",
-              "url": "https://files.pythonhosted.org/packages/6a/3e/b68c118422ec867fa7ab88444e1274aa40681c606d59ac27de5a5588f082/python_dotenv-1.0.1-py3-none-any.whl",
-              "sha256": "f7b63ef50f1b690dddf550d03497b66d609393b40b564ed0d674909a68ebf16a"
-            }
-          ]
-        },
-        {
-          "name": "python3-pydantic-settings",
-          "buildsystem": "simple",
-          "build-commands": [
-            "pip3 install --verbose --exists-action=i --no-index --find-links=\"file://${PWD}\" --prefix=${FLATPAK_DEST} \"pydantic-settings\" --no-build-isolation"
-          ],
-          "sources": [
-            {
-              "type": "file",
-              "url": "https://files.pythonhosted.org/packages/16/2f/2b6f29b916b62d61a4bf0fef67f66d3d7b7b5ca22cded1d40249232cd7ba/pydantic_settings-2.7.1-py3-none-any.whl",
-              "sha256": "e00c05d5fa6cbbb227c84bd7487c5c1065084119b750df7c8c1a554aed236eb5"
-            }
-          ]
-        },
-        {
-          "name": "python3-markdown",
-          "buildsystem": "simple",
-          "build-commands": [
-            "pip3 install --verbose --exists-action=i --no-index --find-links=\"file://${PWD}\" --prefix=${FLATPAK_DEST} \"markdown\" --no-build-isolation"
-          ],
-          "sources": [
-            {
-              "type": "file",
-              "url": "https://files.pythonhosted.org/packages/5c/d7/5122bae8b651082a1fb5f299cd80a262e35a10001ae4e3b45e5a1f5f5145/Markdown-3.7-py3-none-any.whl",
-              "sha256": "7eb6df5690b81a1d7942992c97fad2938e956e79df20cbc6186e9c3a77b1c803"
-            }
-          ]
+            "name": "popup-ai",
+            "buildsystem": "meson",
+            "sources": [
+                {
+                    "type": "dir",
+                    "path": "."
+                }
+            ]
         }
-      ]
-    },
-    {
-      "name": "popup-ai",
-      "buildsystem": "meson",
-      "sources": [
-        {
-          "type": "dir",
-          "path": "."
-        }
-      ]
-    }
-  ]
+    ]
 }
