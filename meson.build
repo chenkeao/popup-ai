@@ -64,3 +64,9 @@ install_data(
   install_dir: datadir / 'icons' / 'hicolor' / 'scalable' / 'apps',
   rename: application_id + '.svg'
 )
+
+# AppStream metainfo
+install_data(
+  'data' / application_id + '.metainfo.xml',
+  install_dir: datadir / 'metainfo'
+)
