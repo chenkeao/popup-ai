@@ -8,12 +8,12 @@ from typing import AsyncIterator, Dict, List, Optional
 
 import httpx
 
-from popup_ai.constants import (
+from src.constants import (
     HTTP_TIMEOUT,
     MAX_KEEPALIVE_CONNECTIONS,
     MAX_CONNECTIONS,
 )
-from popup_ai.logger import get_logger, log_ai_request, log_ai_response, log_ai_stream_chunk
+from src.logger import get_logger, log_ai_request, log_ai_response, log_ai_stream_chunk
 
 # Configure logging
 logger = get_logger(__name__)

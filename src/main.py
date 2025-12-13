@@ -5,7 +5,7 @@ import gi
 
 gi.require_version("Gio", "2.0")
 from gi.repository import Gio, GLib
-from popup_ai.application import PopupAIApplication
+from src.application import PopupAIApplication
 
 
 def is_app_running():
@@ -138,7 +138,7 @@ def main():
 
     # Start a new detached process
     subprocess.Popen(
-        [sys.executable, "-m", "popup_ai.main", "--background-start"]
+        [sys.executable, "-m", "src.main", "--background-start"]
         + ([initial_text] if initial_text else []),
         start_new_session=True,
         stdin=subprocess.DEVNULL,

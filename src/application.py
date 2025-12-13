@@ -7,10 +7,10 @@ gi.require_version("Adw", "1")
 gi.require_version("Gdk", "4.0")
 
 from gi.repository import Gtk, Adw, Gio, GLib, Gdk
-from popup_ai.window import PopupAIWindow
-from popup_ai.config import Settings
-from popup_ai.logger import setup_logging, get_logger
-from popup_ai.constants import (
+from src.window import PopupAIWindow
+from src.config import Settings
+from src.logger import setup_logging, get_logger
+from src.constants import (
     APP_ID,
     APP_NAME,
     APP_VERSION,
@@ -59,21 +59,37 @@ class PopupAIApplication(Adw.Application):
 
     def show_window(self, initial_text=""):
         """Show the window, restoring or creating as needed."""
+        logger.info(f"show_window called with initial_text: '{initial_text}'")
+        logger.info(f"Window exists: {self.window is not None}")
         if self.window is not None:
+            logger.info("Window is not None, checking surface...")
             try:
                 if self.window.get_surface() is None:
                     self.window = None
                 else:
+                    # Force window to front with multiple methods
+                    self.window.set_visible(True)
                     self.window.unminimize()
-                    self.window.preset()
-                    # self.window.present_with_time(GLib.get_monotonic_time() // 1000)
+                    self.window.present()
+
+                    # Use urgency hint to request attention
+                    try:
+                        surface = self.window.get_surface()
+                        if surface and hasattr(surface, "set_urgency_hint"):
+                            surface.set_urgency_hint(True)
+                            GLib.timeout_add(
+                                100, lambda: surface.set_urgency_hint(False) if surface else False
+                            )
+                    except Exception:
+                        pass
 
                     if initial_text:
                         self.window.set_initial_text(initial_text)
 
                     self.window.focus_input()
                     return
-            except Exception:
+            except Exception as e:
+                logger.error(f"Exception in show_window: {e}")
                 old_window = self.window
                 if (
                     hasattr(old_window, "current_conversation")

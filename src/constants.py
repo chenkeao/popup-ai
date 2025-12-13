@@ -72,9 +72,8 @@ ICON_SCIENCE = "applications-science-symbolic"
 ICON_SYSTEM = "preferences-system-symbolic"
 ICON_GRAPHICS = "applications-graphics-symbolic"
 
-# File Paths (relative to user home)
-CONFIG_DIR_NAME = ".config/popup-ai"
-DATA_DIR_NAME = ".local/share/popup-ai"
+# File Paths
+APP_SUBDIR = "popup-ai"  # Subdirectory name for app data
 CONFIG_FILE_NAME = "config.json"
 PROMPTS_FILE_NAME = "prompts.json"
 MODELS_FILE_NAME = "models.json"

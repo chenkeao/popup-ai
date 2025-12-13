@@ -8,8 +8,8 @@ gi.require_version("Adw", "1")
 
 from gi.repository import Gtk, Adw
 
-from popup_ai.config import Settings, ModelConfig, PromptTemplate
-from popup_ai.ui_strings import (
+from src.config import Settings, ModelConfig, PromptTemplate
+from src.ui_strings import (
     DIALOG_DELETE_PROMPT_TITLE,
     DIALOG_DELETE_PROMPT_BODY,
     ERROR_NO_NAME,
@@ -26,7 +26,7 @@ from popup_ai.ui_strings import (
     PLACEHOLDER_PROMPT_NAME,
     PLACEHOLDER_DESCRIPTION,
 )
-from popup_ai.constants import (
+from src.constants import (
     MARGIN_MEDIUM,
     MARGIN_LARGE,
     SPACING_SMALL,

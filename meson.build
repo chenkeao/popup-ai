@@ -29,7 +29,7 @@ conf.set('application_id', application_id)
 
 # Install Python modules
 py_install_dir = python.get_install_dir()
-install_subdir('popup_ai',
+install_subdir('src',
   install_dir: py_install_dir
 )
 

@@ -1,6 +1,6 @@
 """HTML template for conversation display."""
 
-from popup_ai.constants import MATHJAX_CDN_URL
+from src.constants import MATHJAX_CDN_URL
 
 
 def get_mathjax_config() -> str:

@@ -16,12 +16,12 @@ gi.require_version("WebKit", "6.0")
 
 from gi.repository import Gtk, Adw, GLib, Gdk, Gio, WebKit
 
-from popup_ai.config import Settings, Conversation, ConversationMessage, ModelConfig
-from popup_ai.ai_service import create_ai_service, AIService, fetch_available_models
-from popup_ai.preferences import PreferencesWindow
-from popup_ai.html_template import generate_html_template
-from popup_ai.logger import get_logger
-from popup_ai.constants import (
+from src.config import Settings, Conversation, ConversationMessage, ModelConfig
+from src.ai_service import create_ai_service, AIService, fetch_available_models
+from src.preferences import PreferencesWindow
+from src.html_template import generate_html_template
+from src.logger import get_logger
+from src.constants import (
     DEFAULT_WINDOW_WIDTH,
     DEFAULT_WINDOW_HEIGHT,
     SIDEBAR_WIDTH,
@@ -51,7 +51,7 @@ from popup_ai.constants import (
     ICON_SIDEBAR_HIDE,
     ICON_REFRESH,
 )
-from popup_ai.ui_strings import (
+from src.ui_strings import (
     WINDOW_TITLE,
     BTN_SEND,
     BTN_STOP,
@@ -206,10 +206,15 @@ class PopupAIWindow(Adw.ApplicationWindow):
                 return
             self._current_ui_font = ui_font
 
+            # Parse font name (remove size)
+            font_parts = ui_font.rsplit(" ", 1)
+            font_family = font_parts[0] if font_parts else "Sans"
+
             # Create dynamic CSS for UI font
             css_data = f"""
             window {{
-                font-family: {ui_font};
+                font-family: {font_family};
+                font-size: {font_parts[1] if len(font_parts) > 1 else '11'}pt;
             }}
             """
 
@@ -894,7 +899,7 @@ class PopupAIWindow(Adw.ApplicationWindow):
         """Generate HTML for the conversation."""
         import html
         import markdown
-        from popup_ai.ui_strings import CONV_ROLE_USER, CONV_ROLE_ASSISTANT, TOOLTIP_COPY_SOURCE
+        from src.ui_strings import CONV_ROLE_USER, CONV_ROLE_ASSISTANT, TOOLTIP_COPY_SOURCE
 
         # Detect dark mode
         style_manager = Adw.StyleManager.get_default()

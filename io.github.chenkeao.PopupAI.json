@@ -11,10 +11,7 @@
         "--device=dri",
         "--share=network",
         "--talk-name=org.freedesktop.secrets",
-        "--own-name=io.github.chenkeao.PopupAI",
-        "--filesystem=xdg-config/popup-ai:create",
-        "--filesystem=xdg-data/popup-ai:create",
-        "--filesystem=xdg-run/popup-ai:create"
+        "--own-name=io.github.chenkeao.PopupAI"
     ],
     "cleanup": [
         "/include",
