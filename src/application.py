@@ -59,37 +59,11 @@ class PopupAIApplication(Adw.Application):
 
     def show_window(self, initial_text=""):
         """Show the window, restoring or creating as needed."""
-        logger.info(f"show_window called with initial_text: '{initial_text}'")
-        logger.info(f"Window exists: {self.window is not None}")
+        # On Wayland, existing windows can't steal focus, but new windows can
+        # So we always recreate the window to ensure it comes to the top
         if self.window is not None:
-            logger.info("Window is not None, checking surface...")
             try:
-                if self.window.get_surface() is None:
-                    self.window = None
-                else:
-                    # Force window to front with multiple methods
-                    self.window.set_visible(True)
-                    self.window.unminimize()
-                    self.window.present()
-
-                    # Use urgency hint to request attention
-                    try:
-                        surface = self.window.get_surface()
-                        if surface and hasattr(surface, "set_urgency_hint"):
-                            surface.set_urgency_hint(True)
-                            GLib.timeout_add(
-                                100, lambda: surface.set_urgency_hint(False) if surface else False
-                            )
-                    except Exception:
-                        pass
-
-                    if initial_text:
-                        self.window.set_initial_text(initial_text)
-
-                    self.window.focus_input()
-                    return
-            except Exception as e:
-                logger.error(f"Exception in show_window: {e}")
+                # Save current conversation before destroying window
                 old_window = self.window
                 if (
                     hasattr(old_window, "current_conversation")
@@ -100,17 +74,21 @@ class PopupAIApplication(Adw.Application):
                         old_window.settings.save_conversation(old_window.current_conversation)
 
                 try:
-                    old_window.destroy() if old_window is not None else None
+                    old_window.destroy()
                 except Exception:
                     pass
-                self.window = None
+            except Exception as e:
+                logger.error(f"Exception cleaning up old window: {e}")
 
+            self.window = None
+
+        # Create new window (which CAN steal focus on Wayland)
         self.window = PopupAIWindow(application=self, settings=self.settings)
         self.window.connect("destroy", self._on_window_destroyed)
 
-        self.window.set_visible(True)
+        # self.window.set_visible(True)
         self.window.present()
-        self.window.present_with_time(GLib.get_monotonic_time() // 1000)
+        # self.window.present_with_time(GLib.get_monotonic_time() // 1000)
 
         if initial_text:
             self.window.set_initial_text(initial_text)
