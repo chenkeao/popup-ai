@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.chenkeao.PopupAI</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>Popup AI</name>
+  <summary>AI assistant popup window for Wayland</summary>
+  <description>
+    <p>
+      Popup AI is a quick-access AI assistant that runs as a background daemon on Wayland.
+      It provides instant access to AI chat capabilities with a popup window.
+    </p>
+    <p>Features:</p>
+    <ul>
+      <li>Background daemon for instant access</li>
+      <li>Native Wayland support with GTK4 and libadwaita</li>
+      <li>Configurable AI provider support</li>
+      <li>Clean and modern interface</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">io.github.chenkeao.PopupAI.desktop</launchable>
+  <url type="homepage">https://github.com/chenkeao/popup-ai</url>
+  <url type="bugtracker">https://github.com/chenkeao/popup-ai/issues</url>
+  <developer_name>Kyle Chen</developer_name>
+  <content_rating type="oars-1.1">
+    <content_attribute id="social-chat">intense</content_attribute>
+  </content_rating>
+  <releases>
+    <release version="0.1.0" date="2024-12-13">
+      <description>
+        <p>Initial release</p>
+      </description>
+    </release>
+  </releases>
+  <categories>
+    <category>Utility</category>
+    <category>Office</category>
+  </categories>
+  <keywords>
+    <keyword>AI</keyword>
+    <keyword>Chat</keyword>
+    <keyword>Assistant</keyword>
+    <keyword>GPT</keyword>
+  </keywords>
+  <screenshots>
+    <screenshot type="default">
+      <caption>Main window</caption>
+    </screenshot>
+  </screenshots>
+  <requires>
+    <display_length compare="ge">360</display_length>
+  </requires>
+  <supports>
+    <control>keyboard</control>
+    <control>pointing</control>
+  </supports>
+</component>

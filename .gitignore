@@ -10,3 +10,10 @@ dist/
 venv/
 .mypy_cache/
 .ruff_cache/
+
+# Flatpak build artifacts
+.flatpak-builder/
+build-dir/
+*.flatpak
+repo/
+

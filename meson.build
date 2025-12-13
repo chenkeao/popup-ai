@@ -29,7 +29,7 @@ conf.set('application_id', application_id)
 
 # Install Python modules
 py_install_dir = python.get_install_dir()
-install_subdir('popup_ai',
+install_subdir('src',
   install_dir: py_install_dir
 )
 
@@ -63,4 +63,10 @@ install_data(
   'data' / 'icon.svg',
   install_dir: datadir / 'icons' / 'hicolor' / 'scalable' / 'apps',
   rename: application_id + '.svg'
+)
+
+# AppStream metainfo
+install_data(
+  'data' / application_id + '.metainfo.xml',
+  install_dir: datadir / 'metainfo'
 )

@@ -1,3 +1,3 @@
 #!/bin/sh
 
-exec @PYTHON@ -m popup_ai.main "$@"
+exec @PYTHON@ -m src.main "$@"

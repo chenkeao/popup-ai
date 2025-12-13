@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
-from popup_ai.constants import (
+from src.constants import (
     DEFAULT_WINDOW_WIDTH,
     DEFAULT_WINDOW_HEIGHT,
     INPUT_MAX_HEIGHT,
@@ -18,14 +18,13 @@ from popup_ai.constants import (
     DEFAULT_WEBVIEW_FONT_FAMILY,
     DEFAULT_WEBVIEW_FONT_SIZE,
     AUTO_FETCH_MODELS_DEFAULT,
-    CONFIG_DIR_NAME,
-    DATA_DIR_NAME,
+    APP_SUBDIR,
     CONFIG_FILE_NAME,
     PROMPTS_FILE_NAME,
     MODELS_FILE_NAME,
     CONVERSATIONS_DIR_NAME,
 )
-from popup_ai.ui_strings import DEFAULT_PROMPTS
+from src.ui_strings import DEFAULT_PROMPTS
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -75,8 +74,14 @@ class Settings:
     """Application settings manager."""
 
     def __init__(self):
-        self.config_dir = Path.home() / CONFIG_DIR_NAME
-        self.data_dir = Path.home() / DATA_DIR_NAME
+        # Use XDG base directories (respects Flatpak sandbox)
+        import os
+
+        xdg_config_home = os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config"))
+        xdg_data_home = os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local" / "share"))
+
+        self.config_dir = Path(xdg_config_home) / APP_SUBDIR
+        self.data_dir = Path(xdg_data_home) / APP_SUBDIR
         self.config_file = self.config_dir / CONFIG_FILE_NAME
         self.prompts_file = self.config_dir / PROMPTS_FILE_NAME
         self.models_file = self.config_dir / MODELS_FILE_NAME

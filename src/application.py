@@ -7,10 +7,10 @@ gi.require_version("Adw", "1")
 gi.require_version("Gdk", "4.0")
 
 from gi.repository import Gtk, Adw, Gio, GLib, Gdk
-from popup_ai.window import PopupAIWindow
-from popup_ai.config import Settings
-from popup_ai.logger import setup_logging, get_logger
-from popup_ai.constants import (
+from src.window import PopupAIWindow
+from src.config import Settings
+from src.logger import setup_logging, get_logger
+from src.constants import (
     APP_ID,
     APP_NAME,
     APP_VERSION,
@@ -39,46 +39,31 @@ logger = get_logger(__name__)
 class PopupAIApplication(Adw.Application):
     """Main application class."""
 
-    def __init__(self, initial_text=None, service_mode=False):
+    def __init__(self, initial_text=None):
+        # Use DEFAULT_FLAGS which enables single-instance by default
         super().__init__(
             application_id=APP_ID,
-            flags=(
-                Gio.ApplicationFlags.FLAGS_NONE
-                if service_mode
-                else Gio.ApplicationFlags.HANDLES_COMMAND_LINE
-            ),
+            flags=Gio.ApplicationFlags.DEFAULT_FLAGS,
         )
         # Setup logging first
         setup_logging()
-        logger.info(f"Initializing {APP_NAME} v{APP_VERSION} (service_mode={service_mode})")
+        logger.info(f"Initializing {APP_NAME} v{APP_VERSION}")
 
         self.initial_text = initial_text
         self.window = None
         self.settings = Settings()
-        self.service_mode = service_mode
         self._dbus_id = None
 
-        # In service mode, hold the application to prevent auto-exit
-        if self.service_mode:
-            self.hold()
+        # Connect to activate signal
+        self.connect("activate", self.on_activate)
 
     def show_window(self, initial_text=""):
         """Show the window, restoring or creating as needed."""
+        # On Wayland, existing windows can't steal focus, but new windows can
+        # So we always recreate the window to ensure it comes to the top
         if self.window is not None:
             try:
-                if self.window.get_surface() is None:
-                    self.window = None
-                else:
-                    self.window.unminimize()
-                    self.window.preset()
-                    # self.window.present_with_time(GLib.get_monotonic_time() // 1000)
-
-                    if initial_text:
-                        self.window.set_initial_text(initial_text)
-
-                    self.window.focus_input()
-                    return
-            except Exception:
+                # Save current conversation before destroying window
                 old_window = self.window
                 if (
                     hasattr(old_window, "current_conversation")
@@ -89,19 +74,21 @@ class PopupAIApplication(Adw.Application):
                         old_window.settings.save_conversation(old_window.current_conversation)
 
                 try:
-                    old_window.destroy() if old_window is not None else None
+                    old_window.destroy()
                 except Exception:
                     pass
-                self.window = None
+            except Exception as e:
+                logger.error(f"Exception cleaning up old window: {e}")
 
-        self.window = PopupAIWindow(
-            application=self, settings=self.settings, service_mode=self.service_mode
-        )
+            self.window = None
+
+        # Create new window (which CAN steal focus on Wayland)
+        self.window = PopupAIWindow(application=self, settings=self.settings)
         self.window.connect("destroy", self._on_window_destroyed)
 
-        self.window.set_visible(True)
+        # self.window.set_visible(True)
         self.window.present()
-        self.window.present_with_time(GLib.get_monotonic_time() // 1000)
+        # self.window.present_with_time(GLib.get_monotonic_time() // 1000)
 
         if initial_text:
             self.window.set_initial_text(initial_text)
@@ -112,12 +99,18 @@ class PopupAIApplication(Adw.Application):
         """Handle window destruction."""
         self.window = None
 
+    def on_activate(self, app):
+        """Called when the application is activated."""
+        # Show window with initial text
+        self.show_window(self.initial_text or "")
+
     def _on_dbus_method_call(
         self, connection, sender, object_path, interface_name, method_name, parameters, invocation
     ):
         """Handle D-Bus method calls."""
         if method_name == "ShowWindow":
             initial_text = parameters[0]
+            # Update the window with new text
             GLib.idle_add(self.show_window, initial_text)
             invocation.return_value(None)
         else:
@@ -127,30 +120,17 @@ class PopupAIApplication(Adw.Application):
                 f"Unknown method: {method_name}",
             )
 
-    def do_activate(self):
-        """Called when the application is activated."""
-        if not self.service_mode:
-            self.show_window(self.initial_text or "")
-
-    def do_command_line(self, command_line):
-        """Handle command line arguments."""
-        args = command_line.get_arguments()[1:]
-        text_args = [arg for arg in args if not arg.startswith("--")]
-        if text_args:
-            self.initial_text = " ".join(text_args)
-        self.activate()
-        return 0
-
     def do_startup(self):
         """Called when the application starts."""
         Adw.Application.do_startup(self)
         Gtk.Window.set_default_icon_name(APP_ID)
         self.setup_actions()
-        if self.service_mode:
-            self._register_dbus_interface()
+
+        # Register custom D-Bus interface
+        self._register_dbus_interface()
 
     def _register_dbus_interface(self):
-        """Register custom D-Bus interface for the service."""
+        """Register custom D-Bus interface for receiving ShowWindow calls."""
         try:
             node_info = Gio.DBusNodeInfo.new_for_xml(DBUS_INTERFACE)
             interface_info = node_info.interfaces[0]
@@ -163,8 +143,8 @@ class PopupAIApplication(Adw.Application):
                     None,
                     None,
                 )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error(f"Failed to register D-Bus interface: {e}")
 
     def setup_actions(self):
         """Setup application actions."""
