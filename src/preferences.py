@@ -9,6 +9,7 @@ gi.require_version("Adw", "1")
 from gi.repository import Gtk, Adw
 
 from src.config import Settings, ModelConfig, PromptTemplate
+from src.logger import get_logger
 from src.ui_strings import (
     DIALOG_DELETE_PROMPT_TITLE,
     DIALOG_DELETE_PROMPT_BODY,
@@ -32,6 +33,9 @@ from src.constants import (
     SPACING_SMALL,
     SPACING_MEDIUM,
 )
+
+# Configure logging
+logger = get_logger(__name__)
 
 
 class PreferencesWindow(Adw.PreferencesWindow):
@@ -282,27 +286,49 @@ class PreferencesWindow(Adw.PreferencesWindow):
         # Webview Font settings
         webview_font_group = Adw.PreferencesGroup()
         webview_font_group.set_title("Conversation Font")
-        webview_font_group.set_description("Font used in the conversation display")
+        webview_font_group.set_description(
+            "Fonts used in the conversation display (with fallback support)"
+        )
         appearance_page.add(webview_font_group)
 
-        # Webview Font
-        webview_font_row = Adw.ActionRow()
-        webview_font_row.set_title("Conversation Font")
-        webview_font_row.set_subtitle("Font for chat messages and content")
+        # Font size setting
+        self.webview_font_size_row = Adw.SpinRow()
+        self.webview_font_size_row.set_title("Font Size")
+        self.webview_font_size_row.set_subtitle("Base font size for conversation text")
+        adjustment = Gtk.Adjustment(
+            value=self.settings.get("webview_font_size", 14),
+            lower=8,
+            upper=32,
+            step_increment=1,
+            page_increment=2,
+            page_size=0,
+        )
+        self.webview_font_size_row.set_adjustment(adjustment)
+        self.webview_font_size_row.connect("changed", self.on_webview_font_size_changed)
+        webview_font_group.add(self.webview_font_size_row)
 
-        self.webview_font_button = Gtk.FontButton()
-        # Construct font string from family and size
-        webview_font_family = self.settings.get("webview_font_family", "Sans")
-        webview_font_size = self.settings.get("webview_font_size", 14)
-        current_webview_font = f"{webview_font_family} {webview_font_size}"
-        self.webview_font_button.set_font(current_webview_font)
-        self.webview_font_button.set_use_font(True)
-        self.webview_font_button.set_use_size(True)
-        self.webview_font_button.set_valign(Gtk.Align.CENTER)
-        self.webview_font_button.connect("font-set", self.on_webview_font_changed)
-        webview_font_row.add_suffix(self.webview_font_button)
+        # Font families list
+        self.webview_fonts_group = Adw.PreferencesGroup()
+        self.webview_fonts_group.set_title("Font Families (Priority Order)")
+        self.webview_fonts_group.set_description(
+            "Fonts are used in order. If the first font is unavailable, the next one is used."
+        )
+        appearance_page.add(self.webview_fonts_group)
 
-        webview_font_group.add(webview_font_row)
+        # Add font button
+        add_font_row = Adw.ActionRow()
+        add_font_row.set_title("Add Font")
+        add_font_btn = Gtk.Button()
+        add_font_btn.set_icon_name("list-add-symbolic")
+        add_font_btn.set_valign(Gtk.Align.CENTER)
+        add_font_btn.add_css_class("flat")
+        add_font_btn.connect("clicked", self.on_add_webview_font)
+        add_font_row.add_suffix(add_font_btn)
+        self.webview_fonts_group.add(add_font_row)
+
+        # Track font rows
+        self.webview_font_rows = []
+        self.refresh_webview_fonts_list()
 
         # Reset buttons
         reset_group = Adw.PreferencesGroup()
@@ -525,8 +551,170 @@ class PreferencesWindow(Adw.PreferencesWindow):
         if self.on_settings_changed:
             self.on_settings_changed()
 
+    def on_webview_font_size_changed(self, spin_row):
+        """Handle webview font size change."""
+        font_size = int(spin_row.get_value())
+        self.settings.set("webview_font_size", font_size)
+
+        # Notify parent to update UI
+        if self.on_settings_changed:
+            self.on_settings_changed()
+
+    def refresh_webview_fonts_list(self):
+        """Refresh the webview fonts list display."""
+        # Clear existing font rows (except the add button)
+        for row in self.webview_font_rows:
+            self.webview_fonts_group.remove(row)
+        self.webview_font_rows.clear()
+
+        # Get current font families
+        font_families = self.settings.get("webview_font_families", ["Sans"])
+        if not isinstance(font_families, list):
+            font_families = [str(font_families)]
+
+        # Add font rows
+        for idx, font_family in enumerate(font_families):
+            font_row = self._create_webview_font_row(font_family, idx, len(font_families))
+            self.webview_font_rows.append(font_row)
+            self.webview_fonts_group.add(font_row)
+
+    def _create_webview_font_row(self, font_family: str, index: int, total: int):
+        """Create a font row widget."""
+        font_row = Adw.ActionRow()
+        font_row.set_title(font_family)
+        if index == 0:
+            font_row.set_subtitle("Primary font")
+        else:
+            font_row.set_subtitle(f"Fallback {index}")
+
+        # Button box for controls
+        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        button_box.set_valign(Gtk.Align.CENTER)
+
+        # Move up button
+        if index > 0:
+            up_btn = Gtk.Button()
+            up_btn.set_icon_name("go-up-symbolic")
+            up_btn.add_css_class("flat")
+            up_btn.set_tooltip_text("Move Up")
+            up_btn.connect("clicked", self.on_move_font_up, index)
+            button_box.append(up_btn)
+
+        # Move down button
+        if index < total - 1:
+            down_btn = Gtk.Button()
+            down_btn.set_icon_name("go-down-symbolic")
+            down_btn.add_css_class("flat")
+            down_btn.set_tooltip_text("Move Down")
+            down_btn.connect("clicked", self.on_move_font_down, index)
+            button_box.append(down_btn)
+
+        # Delete button
+        delete_btn = Gtk.Button()
+        delete_btn.set_icon_name("user-trash-symbolic")
+        delete_btn.add_css_class("flat")
+        delete_btn.set_tooltip_text("Remove Font")
+        delete_btn.connect("clicked", self.on_remove_webview_font, index)
+        button_box.append(delete_btn)
+
+        font_row.add_suffix(button_box)
+        return font_row
+
+    def on_add_webview_font(self, button):
+        """Handle adding a new webview font."""
+        dialog = Gtk.FontChooserDialog(title="Select Font", transient_for=self)
+        dialog.set_modal(True)
+
+        def on_response(dialog, response):
+            if response == Gtk.ResponseType.OK:
+                font_description = dialog.get_font_desc()
+                if font_description:
+                    font_family = font_description.get_family()
+
+                    # Get current fonts
+                    font_families = self.settings.get("webview_font_families", ["Sans"])
+                    if not isinstance(font_families, list):
+                        font_families = [str(font_families)]
+
+                    # Add new font if not already in list
+                    if font_family not in font_families:
+                        font_families.append(font_family)
+                        self.settings.set("webview_font_families", font_families)
+                        self.refresh_webview_fonts_list()
+
+                        # Notify parent to update UI
+                        if self.on_settings_changed:
+                            self.on_settings_changed()
+            dialog.destroy()
+
+        dialog.connect("response", on_response)
+        dialog.show()
+
+    def on_remove_webview_font(self, button, index: int):
+        """Handle removing a webview font."""
+        font_families = self.settings.get("webview_font_families", ["Sans"])
+        if not isinstance(font_families, list):
+            font_families = [str(font_families)]
+
+        # Don't allow removing the last font
+        if len(font_families) <= 1:
+            self.show_error("At least one font must be configured")
+            return
+
+        # Remove font at index
+        if 0 <= index < len(font_families):
+            font_families.pop(index)
+            self.settings.set("webview_font_families", font_families)
+            self.refresh_webview_fonts_list()
+
+            # Notify parent to update UI
+            if self.on_settings_changed:
+                self.on_settings_changed()
+
+    def on_move_font_up(self, button, index: int):
+        """Handle moving a font up in priority."""
+        if index <= 0:
+            return
+
+        font_families = self.settings.get("webview_font_families", ["Sans"])
+        if not isinstance(font_families, list):
+            font_families = [str(font_families)]
+
+        # Swap with previous
+        font_families[index], font_families[index - 1] = (
+            font_families[index - 1],
+            font_families[index],
+        )
+        self.settings.set("webview_font_families", font_families)
+        self.refresh_webview_fonts_list()
+
+        # Notify parent to update UI
+        if self.on_settings_changed:
+            self.on_settings_changed()
+
+    def on_move_font_down(self, button, index: int):
+        """Handle moving a font down in priority."""
+        font_families = self.settings.get("webview_font_families", ["Sans"])
+        if not isinstance(font_families, list):
+            font_families = [str(font_families)]
+
+        if index >= len(font_families) - 1:
+            return
+
+        # Swap with next
+        font_families[index], font_families[index + 1] = (
+            font_families[index + 1],
+            font_families[index],
+        )
+        self.settings.set("webview_font_families", font_families)
+        self.refresh_webview_fonts_list()
+
+        # Notify parent to update UI
+        if self.on_settings_changed:
+            self.on_settings_changed()
+
     def on_webview_font_changed(self, font_button):
-        """Handle webview font change."""
+        """Handle webview font change (legacy method for migration)."""
         font = font_button.get_font()
         # Parse font string to extract family and size
         # Font string format: "Family Name Size"
@@ -541,7 +729,7 @@ class PreferencesWindow(Adw.PreferencesWindow):
             font_family = font
             font_size = 14
 
-        self.settings.set("webview_font_family", font_family)
+        self.settings.set("webview_font_families", [font_family])
         self.settings.set("webview_font_size", font_size)
 
         # Notify parent to update UI
@@ -560,10 +748,10 @@ class PreferencesWindow(Adw.PreferencesWindow):
 
     def on_reset_webview_font(self, button):
         """Reset webview font to default."""
-        default_font = "Sans 14"
-        self.settings.set("webview_font_family", "Sans")
+        self.settings.set("webview_font_families", ["Sans"])
         self.settings.set("webview_font_size", 14)
-        self.webview_font_button.set_font(default_font)
+        self.webview_font_size_row.set_value(14)
+        self.refresh_webview_fonts_list()
 
         # Notify parent to update UI
         if self.on_settings_changed:

@@ -16,6 +16,7 @@ from src.constants import (
     DEFAULT_PERPLEXITY_ENDPOINT,
     DEFAULT_UI_FONT,
     DEFAULT_WEBVIEW_FONT_FAMILY,
+    DEFAULT_WEBVIEW_FONT_FAMILIES,
     DEFAULT_WEBVIEW_FONT_SIZE,
     AUTO_FETCH_MODELS_DEFAULT,
     APP_SUBDIR,
@@ -116,7 +117,7 @@ class Settings:
             "custom_api_key": "",
             "auto_fetch_models": AUTO_FETCH_MODELS_DEFAULT,
             "ui_font_family": DEFAULT_UI_FONT,
-            "webview_font_family": DEFAULT_WEBVIEW_FONT_FAMILY,
+            "webview_font_families": DEFAULT_WEBVIEW_FONT_FAMILIES,  # New: list of fonts
             "webview_font_size": DEFAULT_WEBVIEW_FONT_SIZE,
         }
 
@@ -124,6 +125,25 @@ class Settings:
             try:
                 with open(self.config_file, "r", encoding="utf-8") as f:
                     loaded_config = json.load(f)
+
+                    # Migration: convert old single font to list format
+                    if (
+                        "webview_font_family" in loaded_config
+                        and "webview_font_families" not in loaded_config
+                    ):
+                        old_font = loaded_config.pop("webview_font_family")
+                        if isinstance(old_font, str) and old_font:
+                            loaded_config["webview_font_families"] = [old_font]
+
+                    # Ensure webview_font_families is a list
+                    if "webview_font_families" in loaded_config:
+                        if not isinstance(loaded_config["webview_font_families"], list):
+                            loaded_config["webview_font_families"] = [
+                                str(loaded_config["webview_font_families"])
+                            ]
+                        elif not loaded_config["webview_font_families"]:
+                            loaded_config["webview_font_families"] = DEFAULT_WEBVIEW_FONT_FAMILIES
+
                     return {**default_config, **loaded_config}
             except Exception as e:
                 logger.error(f"Failed to load config: {e}")

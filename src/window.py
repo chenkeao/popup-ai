@@ -906,7 +906,21 @@ class PopupAIWindow(Adw.ApplicationWindow):
         is_dark = style_manager.get_dark()
 
         # Get font settings
-        font_family = self.settings.get("webview_font_family", "Sans")
+        font_families = self.settings.get("webview_font_families", ["Sans"])
+        if not isinstance(font_families, list):
+            font_families = [str(font_families)]
+
+        # Build CSS font-family string with fallbacks
+        # Quote font names that contain spaces
+        quoted_fonts = []
+        for font in font_families:
+            if " " in font:
+                quoted_fonts.append(f'"{font}"')
+            else:
+                quoted_fonts.append(font)
+
+        # Add generic fallbacks
+        font_family = ", ".join(quoted_fonts)
         font_size = self.settings.get("webview_font_size", 14)
 
         messages_html = ""

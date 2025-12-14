@@ -16,7 +16,8 @@ INPUT_MAX_HEIGHT = 150
 
 # UI Settings
 DEFAULT_UI_FONT = "Sans 11"
-DEFAULT_WEBVIEW_FONT_FAMILY = "Sans"
+DEFAULT_WEBVIEW_FONT_FAMILY = "Sans"  # Deprecated: kept for migration
+DEFAULT_WEBVIEW_FONT_FAMILIES = ["Sans"]  # List of fonts with fallback support
 DEFAULT_WEBVIEW_FONT_SIZE = 14
 
 # API Endpoints
