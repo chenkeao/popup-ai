@@ -59,17 +59,13 @@ class PopupAIApplication(Adw.Application):
 
     def show_window(self, initial_text=""):
         """Show the window, restoring or creating as needed."""
-        # On Wayland, existing windows can't steal focus, but new windows can
-        # So we always recreate the window to ensure it comes to the top
+        logger.debug("Showing application window")
+
         if self.window is not None:
             try:
                 # Save current conversation before destroying window
                 old_window = self.window
-                if (
-                    hasattr(old_window, "current_conversation")
-                    and old_window is not None
-                    and old_window.current_conversation
-                ):
+                if hasattr(old_window, "current_conversation") and old_window.current_conversation:
                     if old_window.current_conversation.messages:
                         old_window.settings.save_conversation(old_window.current_conversation)
 
@@ -83,17 +79,18 @@ class PopupAIApplication(Adw.Application):
             self.window = None
 
         # Create new window (which CAN steal focus on Wayland)
-        self.window = PopupAIWindow(application=self, settings=self.settings)
-        self.window.connect("destroy", self._on_window_destroyed)
+        try:
+            self.window = PopupAIWindow(application=self, settings=self.settings)
+            self.window.connect("destroy", self._on_window_destroyed)
+            self.window.present()
 
-        # self.window.set_visible(True)
-        self.window.present()
-        # self.window.present_with_time(GLib.get_monotonic_time() // 1000)
+            if initial_text:
+                logger.debug(f"Setting initial text: {initial_text}")
+                self.window.set_initial_text(initial_text)
 
-        if initial_text:
-            self.window.set_initial_text(initial_text)
-
-        self.window.focus_input()
+            self.window.focus_input()
+        except Exception as e:
+            logger.error(f"Failed to create or present window: {e}")
 
     def _on_window_destroyed(self, window):
         """Handle window destruction."""
@@ -102,6 +99,7 @@ class PopupAIApplication(Adw.Application):
     def on_activate(self, app):
         """Called when the application is activated."""
         # Show window with initial text
+        logger.debug("Application activated")
         self.show_window(self.initial_text or "")
 
     def _on_dbus_method_call(
@@ -111,6 +109,7 @@ class PopupAIApplication(Adw.Application):
         if method_name == "ShowWindow":
             initial_text = parameters[0]
             # Update the window with new text
+            logger.debug(f"Received D-Bus ShowWindow call with text: {initial_text}")
             GLib.idle_add(self.show_window, initial_text)
             invocation.return_value(None)
         else:

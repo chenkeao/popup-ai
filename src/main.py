@@ -123,14 +123,14 @@ def main():
                     pass
             # Fall through to start the app
 
-    # Extract text arguments (non-option args)
-    text_args = [arg for arg in args if not arg.startswith("--")]
+    # Extract text arguments (non-option args), filtering out empty strings
+    text_args = [arg for arg in args if not arg.startswith("--") and arg.strip()]
     initial_text = " ".join(text_args) if text_args else ""
 
     # If app is already running, send message and exit immediately
     if is_app_running():
-        if initial_text or not args:  # Send message if there's text or no args (just activate)
-            send_show_window(initial_text)
+        # Always send show window message, even with empty text
+        send_show_window(initial_text)
         return 0
 
     # App is not running - start it in background using subprocess

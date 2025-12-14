@@ -40,6 +40,26 @@ class PopupAILogger:
 
     def _setup_main_logger(self):
         """Setup main application logger."""
+        # Disable third-party library loggers FIRST (before setting up handlers)
+        # Only show WARNING and above for third-party libraries
+        third_party_loggers = [
+            "markdown",
+            "MARKDOWN",
+            "httpx",
+            "httpcore",
+            "urllib3",
+            "asyncio",
+            "gi",
+            "gi.repository",
+            "webkit2",
+            "WebKit",
+        ]
+
+        for logger_name in third_party_loggers:
+            logging.getLogger(logger_name).setLevel(logging.WARNING)
+            # Also set propagate to False to prevent propagation to root logger
+            logging.getLogger(logger_name).propagate = True
+
         # Get root logger
         root_logger = logging.getLogger()
         root_logger.setLevel(logging.DEBUG)

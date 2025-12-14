@@ -124,7 +124,7 @@ class OllamaService(AIService):
 
                 async for line in response.aiter_lines():
                     if self._cancel_event.is_set():
-                        logger.info(f"Ollama request cancelled: {self.model}")
+                        # logger.info(f"Ollama request cancelled: {self.model}")
                         return  # Use return instead of break to exit generator properly
 
                     if not line:
@@ -295,7 +295,7 @@ class OpenAICompatibleService(AIService):
 
                 async for line in response.aiter_lines():
                     if self._cancel_event.is_set():
-                        logger.info(f"OpenAI-compatible request cancelled: {self.model}")
+                        # logger.info(f"OpenAI-compatible request cancelled: {self.model}")
                         return  # Use return instead of break to exit generator properly
 
                     if not line or not line.startswith("data: "):

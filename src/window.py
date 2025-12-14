@@ -140,7 +140,7 @@ class PopupAIWindow(Adw.ApplicationWindow):
     def __init__(self, application, settings: Settings, service_mode: bool = False):
         super().__init__(application=application, title=WINDOW_TITLE)
 
-        logger.info(f"Initializing PopupAI window (service_mode={service_mode})")
+        logger.info(f"Initializing` PopupAI window (service_mode={service_mode})")
 
         self.settings = settings
         self.service_mode = service_mode
@@ -1143,16 +1143,16 @@ class PopupAIWindow(Adw.ApplicationWindow):
                 # Get token usage from AI service
                 tokens_input, tokens_output = ai_service.get_last_token_usage()
 
-                logger.debug(
-                    f"Getting token usage from AI service: input={tokens_input}, output={tokens_output}"
-                )
-                logger.debug(f"AI service type: {type(ai_service).__name__}")
-                logger.debug(
-                    f"AI service last_tokens_input: {getattr(ai_service, 'last_tokens_input', 'N/A')}"
-                )
-                logger.debug(
-                    f"AI service last_tokens_output: {getattr(ai_service, 'last_tokens_output', 'N/A')}"
-                )
+                # logger.debug(
+                #     f"Getting token usage from AI service: input={tokens_input}, output={tokens_output}"
+                # )
+                # logger.debug(f"AI service type: {type(ai_service).__name__}")
+                # logger.debug(
+                #     f"AI service last_tokens_input: {getattr(ai_service, 'last_tokens_input', 'N/A')}"
+                # )
+                # logger.debug(
+                #     f"AI service last_tokens_output: {getattr(ai_service, 'last_tokens_output', 'N/A')}"
+                # )
 
                 # Update the assistant message with content and token info
                 self.current_conversation.messages[-1].content = full_response
